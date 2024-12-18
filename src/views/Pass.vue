@@ -1,10 +1,11 @@
 <template>
-	<div>
-		<h1>Вход</h1>
-		<p>Даже без функционала, дать любому доступ к редактированию базы данных университета будет слишком опрометчиво</p>
-		<input type="password" v-model="password" placeholder="Введите пароль" />
-		<button @click="login">Войти</button>
-		<p v-if="error" style="color: red;">{{ error }}</p>
+	<div class="login-container">
+		<div class="login-box">
+			<h1>Админка</h1>
+			<input type="password" v-model="password" @keyup.enter="login" placeholder="Введите пароль" />
+			<button @click="login">Войти</button>
+			<p v-if="error" style="color: red;">{{ error }}</p>
+		</div>
 	</div>
 </template>
 
@@ -23,6 +24,8 @@ export default {
 	},
 	methods: {
 		login() {
+			// он выдает ошибку в начале проекта, но это ни на что не влияет и он будет все равно вырезан за ненадобностью
+			// Module "crypto" has been externalized for browser compatibility. Cannot access "crypto.randomBytes" in client code.
 			bcrypt.compare(this.password, this.storedHash, (err, result) => {
 				if (result) {
 					// Успешный вход
@@ -42,3 +45,18 @@ export default {
 	},
 };
 </script>
+
+<style scoped>
+.login-container {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100vh;
+}
+
+.login-box {
+	text-align: center;
+	padding: 30px;
+
+}
+</style>
