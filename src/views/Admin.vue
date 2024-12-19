@@ -24,8 +24,8 @@
 				<table class="room-table">
 					<thead>
 						<tr>
-							<th>Номер аудитории</th>
-							<th>Координаты</th>
+							<th>Номер</th>
+							<th>Координаты аудитории</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -34,7 +34,7 @@
 							<td>{{ room.points && room.points.length > 0
 								? room.points
 								: "Координаты отсутствуют" }}
-							 </td>
+							</td>
 						</tr>
 					</tbody>
 				</table>
@@ -46,9 +46,35 @@
 				Включить карту
 			</label>
 			<div v-if="showMap" class="map-container">
-				<!-- <svg></svg> -->
+				<svg :width="svgWidth" :height="svgHeight" @wheel="handleZoom" @mousedown="startPan" @mousemove="panMap"
+					@mouseup="endPan">
+					<g :transform="'translate(' + panX + ', ' + panY + ') scale(' + scale + ')'">
+						<!-- проверка перемещения карты и работоспособности центрирования текста -->
+						<rect x="50" y="50" width="100" height="100" fill="black" />
+						<polygon
+							points="200,50 400,50 400,100 250,100 250,200 200,200"
+							fill="blue"
+							stroke="black"
+							stroke-width="2" />
+							<circle
+							:cx="centerX"
+							:cy="centerY"
+							r="5"
+							fill="darkblue" />
+						<text
+							:x="centerX"
+							:y="centerY"
+							text-anchor="middle"
+							alignment-baseline="middle"
+							font-family="Arial"
+							font-size="14"
+							fill="white">
+							Текст
+						</text>
+					</g>
+				</svg>
 				<!-- <p v-else>Выберите корпус и этаж для отображения карты</p> -->
-				<p>пока что нету, не успел еще :(</p>
+				<!-- <p>пока что нету, не успел еще :(</p> -->
 			</div>
 		</div>
 	</div>
@@ -56,6 +82,7 @@
 
 <script>
 import axios from "../axios";
+import polylabel from "polylabel";
 
 export default {
 	data() {
@@ -69,6 +96,23 @@ export default {
 			selectedFloor: null,
 			availableFloors: [],
 			filteredRooms: [],
+			scale: 1,
+			panX: 0,
+			panY: 0,
+			startX: 0,
+			startY: 0,
+			isPanning: false,
+			isDragging: false,
+			dragThreshold: 5,
+			initialTouchDistance: null,
+			initialScale: 1,
+			minScale: 0.2,
+			maxScale: 5,
+			svgWidth: "100%",
+			svgHeight: "100%",
+			// для проверки центрирования текста
+			centerX: null,
+			centerY: null,
 		}
 	},
 	created() {
@@ -90,6 +134,7 @@ export default {
 			localStorage.removeItem("sessionTimeout");
 			this.$router.push("/login");
 		},
+
 		async fetchBuildings() {
 			try {
 				const res = await axios.get("/buildings");
@@ -144,8 +189,9 @@ export default {
 						: null;
 					return {
 						id: el.Id,
-						name: el.Name,
+						// name: el.Name,
 						floor: el.Floor,
+						num_sort: el.Number,
 						number: `${el.Number}/${this.selectedBuildingShortName}`,
 						points: coords,
 						buildingId,
@@ -175,13 +221,87 @@ export default {
 						room.buildingId === this.selectedBuilding &&
 						room.floor === this.selectedFloor
 				);
+				this.sortRooms();
 			}
+		},
+
+		sortRooms() {
+			this.filteredRooms.sort((a, b) => {
+				const regex = /^(\d+)([а-яА-Яa-zA-Z]*)$/;
+
+				const parseRoomNumber = (number) => {
+					const match = number.match(regex);
+					if (match) {
+						const numericPart = parseInt(match[1], 10);
+						const alphaPart = match[2] || "";
+						return { numericPart, alphaPart };
+					}
+					return { numericPart: Number.MAX_SAFE_INTEGER, alphaPart: "" };
+				};
+
+				const roomA = parseRoomNumber(a.num_sort);
+				const roomB = parseRoomNumber(b.num_sort);
+
+				if (roomA.numericPart !== roomB.numericPart) {
+					return roomA.numericPart - roomB.numericPart;
+				}
+				return roomA.alphaPart.localeCompare(roomB.alphaPart, "ru");
+			});
+		},
+
+		handleZoom(event) {
+			event.preventDefault();
+			const scaleBy = 1.1;
+
+			const direction = event.deltaY > 0 ? -1 : 1;
+			const oldScale = this.scale;
+			const newScale = Math.max(this.minScale, Math.min(oldScale * (direction > 0 ? scaleBy : 1 / scaleBy), this.maxScale));
+
+			const rect = event.currentTarget.getBoundingClientRect();
+			const mouseX = (event.clientX - rect.left - this.panX) / oldScale;
+			const mouseY = (event.clientY - rect.top - this.panY) / oldScale;
+
+			this.panX -= (mouseX * newScale - mouseX * oldScale);
+			this.panY -= (mouseY * newScale - mouseY * oldScale);
+
+			this.scale = newScale;
+		},
+
+		startPan(event) {
+			this.isPanning = true;
+			this.isDragging = false;
+			this.startX = event.clientX - this.panX;
+			this.startY = event.clientY - this.panY;
+		},
+
+		panMap(event) {
+			if (this.isPanning) {
+				const deltaX = Math.abs(event.clientX - this.startX);
+				const deltaY = Math.abs(event.clientY - this.startY);
+
+				if (deltaX > this.dragThreshold || deltaY > this.dragThreshold) {
+					this.isDragging = true;
+				}
+
+				this.panX = event.clientX - this.startX;
+				this.panY = event.clientY - this.startY;
+			}
+		},
+
+		endPan() {
+			this.isPanning = false;
 		}
 	},
 	mounted() {
 		// при инициализации компонента
 		this.fetchBuildings();
 		// console.log(this.buildings);
+
+		// проверка работоспособности центрирования текста
+		const p = polylabel([[[200,50],[400,50],[400,100],[250,100],[250,200],[200,200]]], 1.0);
+		// console.log(p);
+		this.centerX = p[0];
+		this.centerY = p[1];
 	},
 	watch: {
 		selectedBuilding(newBuildingId) {
@@ -215,18 +335,21 @@ export default {
 	top: 10px;
 	right: 10px;
 	z-index: 1000;
-	transition: background-color 0.3s ease; /* Анимация при наведении */
+	transition: background-color 0.3s ease;
+	/* Анимация при наведении */
 }
 
 .logout-button:hover {
-  background-color: #e7d0d1; /* Более тёмный оттенок при наведении */
+	background-color: #e7d0d1;
+	/* Более тёмный оттенок при наведении */
 }
 
 .left-panel {
 	flex: 1;
 	padding: 20px;
+	padding-right: 10px;
 	/* background-color: #f4f4f4; */
-	border-right: 1px colid #ccc;
+	/* border-right: 1px solid #ccc; */
 }
 
 .selectors {
@@ -235,11 +358,8 @@ export default {
 
 .room-table-container {
 	max-height: 90vh;
-	/* Ограничиваем высоту таблицы */
 	overflow-y: auto;
-	/* Вертикальная прокрутка */
-	border: 1px solid #ccc;
-	/* Граница для визуального отделения */
+	/* border: 1px solid #ccc; */
 }
 
 .room-table {
@@ -249,22 +369,16 @@ export default {
 
 .room-table th {
 	position: sticky;
-	/* Закрепляем заголовок таблицы */
 	top: 0;
-	/* Позиция заголовка относительно контейнера */
 	background-color: #f9f9f9;
-	/* Цвет фона заголовка */
 	z-index: 1;
-	/* Повышаем приоритет отображения */
 	border: 1px solid #ccc;
-	/* Граница заголовка */
 	padding: 8px;
 	text-align: left;
 }
 
 .room-table td {
 	border: 1px solid #ccc;
-	/* Границы для ячеек */
 	padding: 8px;
 	text-align: left;
 }
@@ -281,19 +395,20 @@ export default {
 .right-panel {
 	flex: 1;
 	padding: 20px;
+	padding-left: 10px;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 }
 
-/* .map-container {
+.map-container {
 	margin-top: 20px;
-	border: 1px colid #ccc;
+	border: 1px solid #ccc;
 	width: 100%;
-	height: 500px;
+	height: 100vh;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-} */
+}
 </style>
