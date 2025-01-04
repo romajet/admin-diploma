@@ -4,16 +4,14 @@
 		<div class="left-panel">
 			<div class="selectors">
 				<label>
-					Корпус:
-					<select v-model="selectedBuilding" @change="updateRooms">
+					<select v-model="selectedBuilding" @change="updateRooms" class="select">
+						<option value="" disabled>Корпус...</option>
 						<option v-for="building in buildings" :key="building.buildingId" :value="building.buildingId">
 							{{ building.shortname }} - {{ building.name }}
 						</option>
 					</select>
-				</label>
-				<label>
-					Этаж:
-					<select v-model="selectedFloor" @change="updateRooms">
+					<select v-model="selectedFloor" @change="updateRooms" class="bottom-selector select">
+						<option value="" disabled>Этаж...</option>
 						<option v-for="floor in availableFloors" :key="floor" :value="floor">
 							Этаж {{ floor }}
 						</option>
@@ -41,10 +39,10 @@
 			</div>
 		</div>
 		<div class="right-panel">
-			<label>
+			<!-- <label>
 				<input type="checkbox" v-model="showMap" />
 				Включить карту
-			</label>
+			</label> -->
 			<div v-if="showMap" class="map-container">
 				<svg :width="svgWidth" :height="svgHeight" @wheel="handleZoom" @mousedown="startPan" @mousemove="panMap"
 					@mouseup="endPan">
@@ -87,13 +85,14 @@ import polylabel from "polylabel";
 export default {
 	data() {
 		return {
-			showMap: false,
+			// showMap: false,
+			showMap: true,
 			buildings: [],
 			classrooms: [],
-			selectedBuilding: null,
+			selectedBuilding: '',
 			selectedBuildingShortName: "",
 			filteredBuildings: [],
-			selectedFloor: null,
+			selectedFloor: '',
 			availableFloors: [],
 			filteredRooms: [],
 			scale: 1,
@@ -313,7 +312,7 @@ export default {
 				? selectedBuilding.shortname
 				: "";
 
-			this.selectedFloor = null;
+			this.selectedFloor = '';
 
 			this.updateRooms();
 		},
@@ -336,12 +335,10 @@ export default {
 	right: 10px;
 	z-index: 1000;
 	transition: background-color 0.3s ease;
-	/* Анимация при наведении */
 }
 
 .logout-button:hover {
 	background-color: #e7d0d1;
-	/* Более тёмный оттенок при наведении */
 }
 
 .left-panel {
@@ -356,8 +353,12 @@ export default {
 	margin-bottom: 20px;
 }
 
+.select {
+	width: 200px;
+}
+
 .room-table-container {
-	max-height: 90vh;
+	max-height: calc(100vh - 85px);
 	overflow-y: auto;
 	/* border: 1px solid #ccc; */
 }
@@ -403,12 +404,17 @@ export default {
 }
 
 .map-container {
-	margin-top: 20px;
+	/* margin-top: 20px; */
 	border: 1px solid #ccc;
 	width: 100%;
 	height: 100vh;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+.bottom-selector {
+	margin-top: 5px;
+	margin-left: 5px;
 }
 </style>
