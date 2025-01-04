@@ -29,7 +29,8 @@
 					<tbody>
 						<tr v-for="room in filteredRooms" :key="room.id">
 							<td>{{ room.number }}</td>
-							<td>{{ room.points && room.points.length > 0
+							<td>
+								{{ room.points && room.points.length > 0
 								? room.points
 								: "Координаты отсутствуют" }}
 							</td>
@@ -44,35 +45,52 @@
 				Включить карту
 			</label> -->
 			<div v-if="showMap" class="map-container">
-				<svg :width="svgWidth" :height="svgHeight" @wheel="handleZoom" @mousedown="startPan" @mousemove="panMap"
-					@mouseup="endPan">
+				<svg :width="svgWidth" :height="svgHeight"
+					@wheel="handleZoom" @mousedown="startPan" @mousemove="panMap" @mouseup="endPan">
+					<!-- группа масштабирования и перемещения -->
 					<g :transform="'translate(' + panX + ', ' + panY + ') scale(' + scale + ')'">
-						<!-- проверка перемещения карты и работоспособности центрирования текста -->
-						<rect x="50" y="50" width="100" height="100" fill="black" />
-						<polygon
-							points="200,50 400,50 400,100 250,100 250,200 200,200"
-							fill="blue"
-							stroke="black"
-							stroke-width="2" />
-							<circle
-							:cx="centerX"
-							:cy="centerY"
-							r="5"
-							fill="darkblue" />
-						<text
-							:x="centerX"
-							:y="centerY"
-							text-anchor="middle"
-							alignment-baseline="middle"
-							font-family="Arial"
-							font-size="14"
-							fill="white">
-							Текст
-						</text>
+						<!-- корпус -->
+						<g v-for="(building, index) in filteredBuildings" :key="index">
+							<polygon
+								:points="formatPoints(building.points)"
+								:fill="'gray'"
+								stroke-width="0" />
+						</g>
+						<g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
+							<polygon
+								:points="formatPoints(classroom.points)"
+								:fill="getFillColor(classroom.name)"
+								stroke="blue"
+								stroke-width="1" />
+							<text
+								:x="calculateText(classroom.points).x"
+								:y="calculateText(classroom.points).y"
+								text-anchor="middle"
+								alignment-baseline="middle"
+								font-family="Arial"
+								font-size="14"
+								fill="black"
+								style="user-select: none;">
+								{{ classroom.number }}
+							</text>
+						</g>
+						<g v-for="(building, index) in filteredBuildings" :key="index">
+							<polygon
+								:points="formatPoints(building.points)"
+								:fill="'transparent'"
+								stroke="black"
+								stroke-width="2" />
+						</g>
+						<g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
+							<polygon
+								:points="formatPoints(classroom.points)"
+								fill-opacity="0"
+								stroke-opacity="0"
+								stroke-width="1"
+								@click="console.log('foo bar');" />
+						</g>
 					</g>
 				</svg>
-				<!-- <p v-else>Выберите корпус и этаж для отображения карты</p> -->
-				<!-- <p>пока что нету, не успел еще :(</p> -->
 			</div>
 		</div>
 	</div>
@@ -95,6 +113,7 @@ export default {
 			selectedFloor: '',
 			availableFloors: [],
 			filteredRooms: [],
+			filteredRoomsCoords: [],
 			scale: 1,
 			panX: 0,
 			panY: 0,
@@ -132,6 +151,45 @@ export default {
 			localStorage.removeItem("loginTimestamp");
 			localStorage.removeItem("sessionTimeout");
 			this.$router.push("/login");
+		},
+
+		formatPoints(points) {
+			if (!Array.isArray(points) || points.length === 0) {
+                console.warn("Неверные данные для points:", points);
+                return "";
+            }
+            // console.log(points);
+            return points
+                .map(point => {
+                    // Проверка на наличие координат x и y
+                    if (point && typeof point.x === 'number' && typeof point.y === 'number' && !isNaN(point.x) && !isNaN(point.y)) {
+                        return `${point.x},${point.y}`;
+                    } else {
+                        console.warn("Неверная точка:", point);
+                        return null;
+                    }
+                })
+                .filter(Boolean) // Убираем все null значения
+                .join(" ");
+		},
+
+		getFillColor(name) {
+            if (name) {
+                if (name.includes("Лестница")) return "LightCyan";
+                if (name.includes("Муж")) return "SkyBlue";
+                if (name.includes("Жен")) return "Pink";
+                return "lightblue";
+            }
+            return "lightblue";
+        },
+
+		calculateText(points) {
+			// console.log(points);
+			const polylabelCoordinates = points.map(point => [point.x, point.y]);
+			// console.log(polylabelCoordinates);
+			const centerPoint = polylabel([polylabelCoordinates], 1.0);
+			// console.log(centerPoint);
+			return { x: centerPoint[0], y: centerPoint[1] };
 		},
 
 		async fetchBuildings() {
@@ -215,10 +273,15 @@ export default {
 		updateRooms() {
 			if (this.selectedBuilding) {
 				this.fetchClassrooms(this.selectedBuilding);
+				this.fetchBuildingCoordinates(this.selectedBuilding);
 				this.filteredRooms = this.classrooms.filter(
 					(room) =>
 						room.buildingId === this.selectedBuilding &&
 						room.floor === this.selectedFloor
+				);
+				this.filteredRoomsCoords = this.filteredRooms.filter(
+					(room) =>
+						Array.isArray(room.points)
 				);
 				this.sortRooms();
 			}
@@ -295,12 +358,6 @@ export default {
 		// при инициализации компонента
 		this.fetchBuildings();
 		// console.log(this.buildings);
-
-		// проверка работоспособности центрирования текста
-		const p = polylabel([[[200,50],[400,50],[400,100],[250,100],[250,200],[200,200]]], 1.0);
-		// console.log(p);
-		this.centerX = p[0];
-		this.centerY = p[1];
 	},
 	watch: {
 		selectedBuilding(newBuildingId) {
