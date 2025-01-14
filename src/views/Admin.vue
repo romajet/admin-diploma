@@ -1,5 +1,7 @@
+<!-- src/views/Admin.vue -->
 <template>
 	<div class="container">
+		<!-- следующая строка будет удалена при внедрении -->
 		<button class="logout-button" @click="logout">Выйти</button>
 		<div class="left-panel">
 			<div class="selectors">
@@ -16,6 +18,7 @@
 							Этаж {{ floor }}
 						</option>
 					</select>
+					<button @click="sendCoordinatesToDatabase" class="send-coords">Отправить изменения</button>
 				</label>
 			</div>
 			<div class="room-table-container">
@@ -24,15 +27,34 @@
 						<tr>
 							<th>Номер</th>
 							<th>Координаты аудитории</th>
+							<th>Действия</th>
 						</tr>
 					</thead>
 					<tbody>
 						<tr v-for="room in filteredRooms" :key="room.id">
 							<td>{{ room.number }}</td>
 							<td>
-								{{ room.points && room.points.length > 0
-								? room.points
-								: "Координаты отсутствуют" }}
+								<template v-if="!room.isEditing">
+									<!-- {{ room.points && room.points.length > 0
+									? room.points
+									: "Координаты отсутствуют" }} -->
+									{{ room.points && room.points.length > 0
+										? room.points.map(p => `(${p.x},${p.y})`).join(';')
+										: "Координаты отсутствуют" }}
+								</template>
+								<template v-else>
+									<div v-for="(point, index) in room.points" :key="index" class="point-edit">
+										<input v-model.number="point.x" type="number" class="coord-input" />
+										<input v-model.number="point.y" type="number" class="coord-input" />
+										<button @click="removePoint(room, index)" class="remove-point-btn">Удалить</button>
+									</div>
+									<button @click="addPoint(room)" class="add-point-btn">Добавить вершину</button>
+								</template>
+							</td>
+							<td>
+								<button @click="toggleEdit(room)" class="edit-btn">
+									{{ room.isEditing ? 'Сохр.' : 'Редакт.' }}
+								</button>
 							</td>
 						</tr>
 					</tbody>
@@ -128,24 +150,22 @@ export default {
 			maxScale: 5,
 			svgWidth: "100%",
 			svgHeight: "100%",
-			// для проверки центрирования текста
-			centerX: null,
-			centerY: null,
+			editedRooms: new Set(),
 		}
 	},
+	// следующий метод будет удален при внедрении
 	created() {
-		// Проверяем, есть ли данные входа
 		const isAuthenticated = localStorage.getItem("authenticated") === "true";
 		const loginTimestamp = parseInt(localStorage.getItem("loginTimestamp"), 10);
 		const sessionTimeout = parseInt(localStorage.getItem("sessionTimeout"), 10);
 		const now = Date.now();
 
-		// Если данные отсутствуют или время истекло
 		if (!isAuthenticated || isNaN(loginTimestamp) || now - loginTimestamp > sessionTimeout) {
-			this.logout(); // Удаляем данные входа и отправляем на страницу логина
+			this.logout();
 		}
 	},
 	methods: {
+		// следующий метод будет удален при внедрении
 		logout() {
 			localStorage.removeItem("authenticated");
 			localStorage.removeItem("loginTimestamp");
@@ -241,12 +261,16 @@ export default {
 			try {
 				const res = await axios.get(`/rooms/buildingId/${buildingId}`);
 				this.classrooms = res.data.map((el) => {
+					console.log(el.Coordinates);
 					const coords = el.Coordinates
-						? JSON.parse(el.Coordinates.slice(1, -1)).points
+						? JSON.parse(el.Coordinates[0] === '"'
+							? el.Coordinates.slice(1, -1)
+							: el.Coordinates
+						).points
 						: null;
 					return {
 						id: el.Id,
-						// name: el.Name,
+						// name: el.Name, // бесполезные для админки данные
 						floor: el.Floor,
 						num_sort: el.Number,
 						number: `${el.Number}/${this.selectedBuildingShortName}`,
@@ -270,6 +294,51 @@ export default {
 			// console.log("Доступные этажи: ", this.availableFloors);
 		},
 
+		toggleEdit(room) {
+			if (room.isEditing) {
+				this.editedRooms.add(room.id);
+			}
+			room.isEditing = !room.isEditing;
+		},
+
+		addPoint(room) {
+			if (!Array.isArray(room.points)) {
+				room.points = [];
+			}
+			room.points.push({ x: 0, y: 0 });
+		},
+
+		removePoint(room, index) {
+			room.points.splice(index, 1);
+		},
+
+		async sendCoordinatesToDatabase() {
+			try {
+				for (const roomId of this.editedRooms) {
+					const room = this.filteredRooms.find(r => r.id === roomId);
+					if (room) {
+						const payload = {
+							Id: room.id,
+							// Coordinates: JSON.stringify(room.points)
+							// Coordinates: `"${JSON.stringify({points: room.points})}"`
+							Coordinates: JSON.stringify({points: room.points})
+						};
+						console.log(payload);
+						const response = await axios.post('/SaveRoomCoordinates', payload);
+
+						response.status === 200
+							? console.log('координаты успешно отправлены:', response.data)
+							: console.log('что-то пошло не так:', response.statusText);
+					}
+				}
+				this.editedRooms.clear();
+				alert('Координаты успешно отправлены');
+			} catch (error) {
+				console.error('ошибка при отправке коориднат:', error);
+				alert('ошибка при отпарвке координат');
+			}
+		},
+
 		updateRooms() {
 			if (this.selectedBuilding) {
 				this.fetchClassrooms(this.selectedBuilding);
@@ -278,10 +347,12 @@ export default {
 					(room) =>
 						room.buildingId === this.selectedBuilding &&
 						room.floor === this.selectedFloor
-				);
+				).map(room => ({
+					...room,
+					isEditing: false
+				}));
 				this.filteredRoomsCoords = this.filteredRooms.filter(
-					(room) =>
-						Array.isArray(room.points)
+					(room) => Array.isArray(room.points)
 				);
 				this.sortRooms();
 			}
@@ -412,6 +483,10 @@ export default {
 
 .select {
 	width: 200px;
+}
+
+.send-coords {
+	margin-left: 10px;
 }
 
 .room-table-container {
