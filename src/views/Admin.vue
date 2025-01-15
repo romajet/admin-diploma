@@ -31,30 +31,52 @@
 						</tr>
 					</thead>
 					<tbody>
-						<tr v-for="room in filteredRooms" :key="room.id">
+						<tr v-for="room in filteredRooms"
+							:key="room.id"
+							:class="{ 'active-room': editingRoom === room.id, 'unsaved-room': editedRooms.has(room.id) }">
 							<td>{{ room.number }}</td>
 							<td>
-								<template v-if="!room.isEditing">
-									<!-- {{ room.points && room.points.length > 0
-									? room.points
-									: "Координаты отсутствуют" }} -->
+								<div v-if="editingRoom === room.id">
+									<div v-for="(point, index) in getEditingRoom().points" :key="index" class="point-edit">
+										<input v-model.number="point.x" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
+										<input v-model.number="point.y" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
+										<button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn">Удалить</button>
+									</div>
+									<button @click="addPoint(getEditingRoom())" class="add-point-btn">Добавить вершину</button>
+								</div>
+								<div v-else>
+									{{ room.points && room.points.length > 0
+										? room.points.map(p => `(${p.x},${p.y})`).join(';')
+										: "Координаты отсутствуют" }}
+								</div>
+								<!-- <template v-if="!room.isEditing">
 									{{ room.points && room.points.length > 0
 										? room.points.map(p => `(${p.x},${p.y})`).join(';')
 										: "Координаты отсутствуют" }}
 								</template>
 								<template v-else>
 									<div v-for="(point, index) in room.points" :key="index" class="point-edit">
-										<input v-model.number="point.x" type="number" class="coord-input" />
-										<input v-model.number="point.y" type="number" class="coord-input" />
+										<input v-model.number="point.x" type="number" class="coord-input" @change="updateRoom(room)" />
+										<input v-model.number="point.y" type="number" class="coord-input" @change="updateRoom(room)" />
 										<button @click="removePoint(room, index)" class="remove-point-btn">Удалить</button>
 									</div>
 									<button @click="addPoint(room)" class="add-point-btn">Добавить вершину</button>
-								</template>
+								</template> -->
 							</td>
 							<td>
-								<button @click="toggleEdit(room)" class="edit-btn">
+								<button
+									v-if="editingRoom === room.id"
+									@click="finishEditing"
+									class="edit-btn"
+								>Завершить</button>
+								<button
+									v-else
+									@click="startEditing(room)"
+									class="edit-btn"
+								>Редактировать</button>
+								<!-- <button @click="toggleEdit(room)" class="edit-btn">
 									{{ room.isEditing ? 'Сохр.' : 'Редакт.' }}
-								</button>
+								</button> -->
 							</td>
 						</tr>
 					</tbody>
@@ -68,20 +90,25 @@
 			</label> -->
 			<div v-if="showMap" class="map-container">
 				<svg :width="svgWidth" :height="svgHeight"
-					@wheel="handleZoom" @mousedown="startPan" @mousemove="panMap" @mouseup="endPan">
+					@wheel="handleZoom"
+					@mousedown="startPan"
+					@mousemove="handleMouseMove"
+					@mouseup="handleMouseUp"
+					@click="handleMapClick">
 					<!-- группа масштабирования и перемещения -->
 					<g :transform="'translate(' + panX + ', ' + panY + ') scale(' + scale + ')'">
-						<!-- корпус -->
+						<!-- корпус только с заливкой -->
 						<g v-for="(building, index) in filteredBuildings" :key="index">
 							<polygon
 								:points="formatPoints(building.points)"
 								:fill="'gray'"
 								stroke-width="0" />
 						</g>
+						<!-- аудитории -->
 						<g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
 							<polygon
 								:points="formatPoints(classroom.points)"
-								:fill="getFillColor(classroom.name)"
+								:fill="getRoomFillColor(classroom)"
 								stroke="blue"
 								stroke-width="1" />
 							<text
@@ -96,23 +123,46 @@
 								{{ classroom.number }}
 							</text>
 						</g>
-						<g v-for="(building, index) in filteredBuildings" :key="index">
+						<!-- корпус только с контуром, поверх всего -->
+						<g v-for="(building, index) in filteredBuildings" :key="'outline' + index">
 							<polygon
 								:points="formatPoints(building.points)"
 								:fill="'transparent'"
 								stroke="black"
 								stroke-width="2" />
 						</g>
-						<g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
+						<!-- отображение аудитории и ее вершин при редактировании -->
+						<g v-if="editingRoom && getEditingRoomPoints().length > 0">
+							<polygon
+								:points="formatPoints(getEditingRoomPoints())"
+								fill="rgba(255, 0, 0, 0.2)"
+								stroke="red"
+								stroke-width="2"
+								stroke-dasharray="5, 5"
+							/>
+							<circle
+								v-for="(point, index) in getEditingRoomPoints()"
+								:key="'point' + index"
+								:cx="point.x"
+								:cy="point.y"
+								r="4"
+								fill="red"
+							/>
+						</g>
+						<!-- полигоны для регистрации нажатий по аудиториям (для части для юзеров, работает) -->
+						<!-- <g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
 							<polygon
 								:points="formatPoints(classroom.points)"
 								fill-opacity="0"
 								stroke-opacity="0"
 								stroke-width="1"
 								@click="console.log('foo bar');" />
-						</g>
+						</g> -->
 					</g>
 				</svg>
+				<div class="cursor-coordinates">
+					{{ cursorX }}, {{ cursorY }}
+				</div>
 			</div>
 		</div>
 	</div>
@@ -150,7 +200,10 @@ export default {
 			maxScale: 5,
 			svgWidth: "100%",
 			svgHeight: "100%",
+			editingRoom: null,
 			editedRooms: new Set(),
+			cursorX: 0,
+			cursorY: 0,
 		}
 	},
 	// следующий метод будет удален при внедрении
@@ -191,6 +244,12 @@ export default {
                 })
                 .filter(Boolean) // Убираем все null значения
                 .join(" ");
+		},
+
+		getRoomFillColor(room) {
+			return this.editedRooms.has(room.id)
+				? "#FFDBBB"
+				: this.getFillColor(room.name);
 		},
 
 		getFillColor(name) {
@@ -261,11 +320,12 @@ export default {
 			try {
 				const res = await axios.get(`/rooms/buildingId/${buildingId}`);
 				this.classrooms = res.data.map((el) => {
-					console.log(el.Coordinates);
+					// console.log(el.Coordinates);
 					const coords = el.Coordinates
-						? JSON.parse(el.Coordinates[0] === '"'
-							? el.Coordinates.slice(1, -1)
-							: el.Coordinates
+						? JSON.parse(
+							el.Coordinates[0] === '"'
+								? el.Coordinates.slice(1, -1)
+								: el.Coordinates
 						).points
 						: null;
 					return {
@@ -292,24 +352,6 @@ export default {
 				...new Set(this.classrooms.map((classroom) => classroom.floor)),
 			].sort((a, b) => a - b);
 			// console.log("Доступные этажи: ", this.availableFloors);
-		},
-
-		toggleEdit(room) {
-			if (room.isEditing) {
-				this.editedRooms.add(room.id);
-			}
-			room.isEditing = !room.isEditing;
-		},
-
-		addPoint(room) {
-			if (!Array.isArray(room.points)) {
-				room.points = [];
-			}
-			room.points.push({ x: 0, y: 0 });
-		},
-
-		removePoint(room, index) {
-			room.points.splice(index, 1);
 		},
 
 		async sendCoordinatesToDatabase() {
@@ -347,10 +389,7 @@ export default {
 					(room) =>
 						room.buildingId === this.selectedBuilding &&
 						room.floor === this.selectedFloor
-				).map(room => ({
-					...room,
-					isEditing: false
-				}));
+				);
 				this.filteredRoomsCoords = this.filteredRooms.filter(
 					(room) => Array.isArray(room.points)
 				);
@@ -423,7 +462,94 @@ export default {
 
 		endPan() {
 			this.isPanning = false;
-		}
+		},
+
+		startEditing(room) {
+			this.editingRoom = room.id;
+			if (!Array.isArray(room.points)) {
+				room.points = [];
+			}
+		},
+
+		finishEditing() {
+			const editedRoom = this.getEditingRoom();
+			if (editedRoom) {
+				const index = this.filteredRoomsCoords.findIndex(r => r.id === editedRoom.id);
+				index !== -1
+					? this.filteredRoomsCoords[index] = { ...editedRoom }
+					: this.filteredRoomsCoords.push({ ...editedRoom });
+			}
+			this.editingRoom = null;
+		},
+
+		getEditingRoomPoints() {
+			const room = this.filteredRooms.find(r => r.id === this.editingRoom);
+			// console.log(room.points);
+			return (room && Array.isArray(room.points)) ? room.points : [];
+		},
+
+		getEditingRoom() {
+			return this.filteredRooms.find(r => r.id === this.editingRoom) || null;
+		},
+
+		handleMapClick(event) {
+			if (!this.editingRoom || this.isPanning) return;
+
+			const room = this.getEditingRoom();
+			if (!room) return;
+
+			const rect = event.currentTarget.getBoundingClientRect();
+			const x = Math.round((event.clientX - rect.left - this.panX) / this.scale);
+			const y = Math.round((event.clientY - rect.top - this.panY) / this.scale);
+
+			if (!Array.isArray(room.points)) {
+				room.points = [];
+			}
+
+			room.points.push({ x, y });
+			this.updateRoom(room);
+		},
+
+		handleMouseMove(event) {
+			this.panMap(event);
+			this.updateCursorCoordinates(event);
+		},
+
+		handleMouseUp(event) {
+			this.isPanning
+				? this.endPan()
+				: this.handleMapClick(event);
+		},
+
+		toggleEdit(room) {
+			if (room.isEditing) {
+				this.editedRooms.add(room.id);
+			}
+			room.isEditing = !room.isEditing;
+		},
+
+		addPoint(room) {
+			if (!Array.isArray(room.points)) {
+				room.points = [];
+			}
+			room.points.push({ x: 0, y: 0 });
+			this.updateRoom(room);
+		},
+
+		removePoint(room, index) {
+			room.points.splice(index, 1);
+			this.updateRoom(room);
+		},
+
+		updateRoom(room) {
+			this.editedRooms.add(room.id);
+		},
+
+		updateCursorCoordinates(event) {
+			const rect = event.currentTarget.getBoundingClientRect();
+			this.cursorX = Math.round((event.clientX - rect.left - this.panX) / this.scale);
+			this.cursorY = Math.round((event.clientY - rect.top - this.panY) / this.scale);
+		},
 	},
 	mounted() {
 		// при инициализации компонента
@@ -548,5 +674,19 @@ export default {
 .bottom-selector {
 	margin-top: 5px;
 	margin-left: 5px;
+}
+
+.cursor-coordinates {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	background-color: rgba(255, 255, 255, 0.7);
+	padding: 5px 10px;
+	font-size: 14px;
+	user-select: none;
+}
+
+.unsaved-room {
+	background-color: rgba(255, 165, 0, 0.2);
 }
 </style>
