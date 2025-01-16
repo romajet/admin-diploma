@@ -94,7 +94,8 @@
 					@mousedown="startPan"
 					@mousemove="handleMouseMove"
 					@mouseup="handleMouseUp"
-					@click="handleMapClick">
+					@click="handleMapClick"
+					@contextmenu="preventContextMenu">
 					<!-- группа масштабирования и перемещения -->
 					<g :transform="'translate(' + panX + ', ' + panY + ') scale(' + scale + ')'">
 						<!-- корпус только с заливкой -->
@@ -131,7 +132,7 @@
 								stroke="black"
 								stroke-width="2" />
 						</g>
-						<!-- отображение аудитории и ее вершин при редактировании -->
+						<!-- отображение вершин и граней аудитории при редактировании -->
 						<g v-if="editingRoom && getEditingRoomPoints().length > 0">
 							<polygon
 								:points="formatPoints(getEditingRoomPoints())"
@@ -149,6 +150,35 @@
 								fill="red"
 							/>
 						</g>
+						<!-- отображение вершин и граней притягивания -->
+						<circle
+							v-if="snapPoint"
+							:cx="snapPoint.x"
+							:cy="snapPoint.y"
+							r="6"
+							fill-="none"
+							stroke="green"
+							stroke-width="2"
+						/>
+						<!-- <line
+							v-if="snapEdge"
+							:x1="snapEdge.start.x"
+							:y1="snapEdge.start.y"
+							:x2="snapEdge.end.x"
+							:y2="snapEdge.end.y"
+							stroke="green"
+							stroke-width="2"
+						/> -->
+						<line
+							v-if="snapEdge"
+							:x1="snapEdge.x1"
+							:y1="snapEdge.y1"
+							:x2="snapEdge.x2"
+							:y2="snapEdge.y2"
+							stroke="green"
+							stroke-width="2"
+							stroke-dasharray="5, 5"
+						/>
 						<!-- полигоны для регистрации нажатий по аудиториям (для части для юзеров, работает) -->
 						<!-- <g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
 							<polygon
@@ -204,6 +234,9 @@ export default {
 			editedRooms: new Set(),
 			cursorX: 0,
 			cursorY: 0,
+			snapPoint: null,
+			snapEdge: null,
+			snapThreshold: 10,
 		}
 	},
 	// следующий метод будет удален при внедрении
@@ -421,6 +454,10 @@ export default {
 			});
 		},
 
+		preventContextMenu(event) {
+			event.preventDefault();
+		},
+
 		handleZoom(event) {
 			event.preventDefault();
 			const scaleBy = 1.1;
@@ -499,8 +536,23 @@ export default {
 			if (!room) return;
 
 			const rect = event.currentTarget.getBoundingClientRect();
-			const x = Math.round((event.clientX - rect.left - this.panX) / this.scale);
-			const y = Math.round((event.clientY - rect.top - this.panY) / this.scale);
+			let x = Math.round((event.clientX - rect.left - this.panX) / this.scale);
+			let y = Math.round((event.clientY - rect.top - this.panY) / this.scale);
+
+			if (this.snapPoint) {
+				x = this.snapPoint.x;
+				y = this.snapPoint.y;
+			} else if (this.snapEdge) {
+				// const { start, end } = this.snapEdge;
+				// start.x === end.x
+				// 	? x = start.x //  вертикальная
+				// 	: y = start.y; // горизонтальная
+				const {x1, y1, x2, y2} = this.snapEdge;
+				console.log(x1, y1, x2, y2);
+				x1 === x2
+					? x = x1
+					: y = y1;
+			}
 
 			if (!Array.isArray(room.points)) {
 				room.points = [];
@@ -513,6 +565,7 @@ export default {
 		handleMouseMove(event) {
 			this.panMap(event);
 			this.updateCursorCoordinates(event);
+			this.updateSnap(event);
 		},
 
 		handleMouseUp(event) {
@@ -550,6 +603,113 @@ export default {
 			this.cursorX = Math.round((event.clientX - rect.left - this.panX) / this.scale);
 			this.cursorY = Math.round((event.clientY - rect.top - this.panY) / this.scale);
 		},
+
+		updateSnap(event) {
+			if (!this.editingRoom) {
+				this.snapPoint = null;
+				this.snapEdge = null;
+				return;
+			}
+
+			const rect = event.currentTarget.getBoundingClientRect();
+			const x = (event.clientX - rect.left - this.panX) / this.scale;
+			const y = (event.clientY - rect.top - this.panY) / this.scale;
+			const cursorPoint = { x, y };
+
+			let closestPoint = null;
+			let closestDistance = Infinity;
+			let closestEdge = null;
+			let closestEdgeDistance = Infinity;
+
+			// проверка всех точек и граней всех аудиторий и зданий
+			const allPoints = [
+				...this.filteredRoomsCoords.flatMap(room => room.points),
+				...this.filteredBuildings.flatMap(building => building.points)
+			];
+
+			for (let i = 0; i < allPoints.length; i++) {
+				const point = allPoints[i];
+				const distance = this.getDistance(cursorPoint, point);
+
+				if (distance < closestDistance) {
+					closestDistance = distance;
+					closestPoint = point;
+				}
+
+				// проверка грани между текущей точкой и следующей
+				const nextPoint = allPoints[(i + 1) % allPoints.length];
+				if (point.x === nextPoint.x || point.y === nextPoint.y) {
+					const edgeDistance = this.getDistanceToLine(cursorPoint, point, nextPoint);
+					if (edgeDistance < closestEdgeDistance) {
+						closestEdgeDistance = edgeDistance;
+						closestEdge = { start: point, end: nextPoint };
+					}
+				}
+				
+			}
+
+			// проверка притягивания, если расстояние меньше порога
+			if (closestDistance < this.snapThreshold / this.scale) {
+				this.snapPoint = closestPoint;
+				this.snapEdge = null;
+			} else if (closestEdgeDistance < this.snapThreshold / this.scale) {
+				this.snapPoint = null;
+				// this.snapEdge = closestEdge;
+				if (closestEdge.start.x === closestEdge.end.x) {
+					// console.log(closestEdge);
+					this.snapEdge = {
+						x1: closestEdge.start.x,
+						y1: -1000,
+						x2: closestEdge.start.x,
+						y2: 3000
+					};
+				} else {
+					this.snapEdge = {
+						x1: -1000,
+						y1: closestEdge.start.y,
+						x2: 3000,
+						y2: closestEdge.start.y
+					};
+				}
+			} else {
+				this.snapPoint = null;
+				this.snapEdge = null;
+			}
+		},
+
+		getDistance(p1, p2) {
+			const dx = p1.x - p2.x;
+			const dy = p1.y - p2.y;
+			return Math.sqrt(dx * dx + dy * dy);
+		},
+
+		getDistanceToLine(p, lineStart, lineEnd) {
+			if (lineStart.x === lineEnd.x) {
+				// вертикальная
+				return Math.abs(p.x - lineStart.x);
+			} else if (lineStart.y === lineEnd.y) {
+				// горизонтальная
+				return Math.abs(p.y - lineStart.y);
+			}
+			// ни та, ни другая
+			return Infinity;
+		},
+
+		getClosestLinePoint(start, end, point) {
+			const A = point.x - start.x;
+			const B = point.y - start.y;
+			const C = end.x - start.x;
+			const D = end.y - start.y;
+
+			const dot = A * C + B * D;
+			const lenSq = C * C + D * D;
+			let param = -1;
+			if (lenSq !== 0) {
+				param = dot / lenSq;
+			}
+
+			return Math.max(0, Math.min(1, param));
+		}
 	},
 	mounted() {
 		// при инициализации компонента
