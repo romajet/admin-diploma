@@ -48,20 +48,7 @@
 									{{ room.points && room.points.length > 0
 										? room.points.map(p => `(${p.x},${p.y})`).join(';')
 										: "Координаты отсутствуют" }}
-								</div>
-								<!-- <template v-if="!room.isEditing">
-									{{ room.points && room.points.length > 0
-										? room.points.map(p => `(${p.x},${p.y})`).join(';')
-										: "Координаты отсутствуют" }}
-								</template>
-								<template v-else>
-									<div v-for="(point, index) in room.points" :key="index" class="point-edit">
-										<input v-model.number="point.x" type="number" class="coord-input" @change="updateRoom(room)" />
-										<input v-model.number="point.y" type="number" class="coord-input" @change="updateRoom(room)" />
-										<button @click="removePoint(room, index)" class="remove-point-btn">Удалить</button>
-									</div>
-									<button @click="addPoint(room)" class="add-point-btn">Добавить вершину</button>
-								</template> -->
+								</div>								
 							</td>
 							<td>
 								<button
@@ -73,10 +60,7 @@
 									v-else
 									@click="startEditing(room)"
 									class="edit-btn"
-								>Редактировать</button>
-								<!-- <button @click="toggleEdit(room)" class="edit-btn">
-									{{ room.isEditing ? 'Сохр.' : 'Редакт.' }}
-								</button> -->
+								>Редактировать</button>								
 							</td>
 						</tr>
 					</tbody>
@@ -160,21 +144,22 @@
 							stroke="green"
 							stroke-width="2"
 						/>
-						<!-- <line
-							v-if="snapEdge"
-							:x1="snapEdge.start.x"
-							:y1="snapEdge.start.y"
-							:x2="snapEdge.end.x"
-							:y2="snapEdge.end.y"
+						<line
+							v-if="snapEdgeVertical"
+							:x1="snapEdgeVertical.x"
+							:y1="-1000"
+							:x2="snapEdgeVertical.x"
+							:y2="3000"
 							stroke="green"
 							stroke-width="2"
-						/> -->
+							stroke-dasharray="5, 5"
+						/>
 						<line
-							v-if="snapEdge"
-							:x1="snapEdge.x1"
-							:y1="snapEdge.y1"
-							:x2="snapEdge.x2"
-							:y2="snapEdge.y2"
+							v-if="snapEdgeHorizontal"
+							:x1="-1000"
+							:y1="snapEdgeHorizontal.y"
+							:x2="3000"
+							:y2="snapEdgeHorizontal.y"
 							stroke="green"
 							stroke-width="2"
 							stroke-dasharray="5, 5"
@@ -235,7 +220,9 @@ export default {
 			cursorX: 0,
 			cursorY: 0,
 			snapPoint: null,
-			snapEdge: null,
+			// snapEdge: null,
+			snapEdgeVertical: null,
+			snapEdgeHorizontal: null,
 			snapThreshold: 10,
 		}
 	},
@@ -389,25 +376,26 @@ export default {
 
 		async sendCoordinatesToDatabase() {
 			try {
+				let updatedCount = 0;
 				for (const roomId of this.editedRooms) {
 					const room = this.filteredRooms.find(r => r.id === roomId);
-					if (room) {
+					if (room && this.areCoordinatesChanged(room)) {
 						const payload = {
 							Id: room.id,
-							// Coordinates: JSON.stringify(room.points)
-							// Coordinates: `"${JSON.stringify({points: room.points})}"`
 							Coordinates: JSON.stringify({points: room.points})
 						};
-						console.log(payload);
-						const response = await axios.post('/SaveRoomCoordinates', payload);
-
-						response.status === 200
-							? console.log('координаты успешно отправлены:', response.data)
-							: console.log('что-то пошло не так:', response.statusText);
+						// console.log(payload);
+						await axios.post('/SaveRoomCoordinates', payload);
+						
+						updatedCount++;
 					}
 				}
 				this.editedRooms.clear();
-				alert('Координаты успешно отправлены');
+				if (updatedCount > 0) {
+					alert(`координаты успешно отправлены для ${updatedCount} аудиторий`);
+				} else {
+					alert('нет изменений для сохранения');
+				}
 			} catch (error) {
 				console.error('ошибка при отправке коориднат:', error);
 				alert('ошибка при отпарвке координат');
@@ -542,16 +530,13 @@ export default {
 			if (this.snapPoint) {
 				x = this.snapPoint.x;
 				y = this.snapPoint.y;
-			} else if (this.snapEdge) {
-				// const { start, end } = this.snapEdge;
-				// start.x === end.x
-				// 	? x = start.x //  вертикальная
-				// 	: y = start.y; // горизонтальная
-				const {x1, y1, x2, y2} = this.snapEdge;
-				console.log(x1, y1, x2, y2);
-				x1 === x2
-					? x = x1
-					: y = y1;
+			} else {
+				if (this.snapEdgeVertical) {
+					x = this.snapEdgeVertical.x;
+				}
+				if (this.snapEdgeHorizontal) {
+					y = this.snapEdgeHorizontal.y;
+				}
 			}
 
 			if (!Array.isArray(room.points)) {
@@ -595,7 +580,31 @@ export default {
 		},
 
 		updateRoom(room) {
-			this.editedRooms.add(room.id);
+			if (this.areCoordinatesChanged(room)) {
+				this.editedRooms.add(room.id);
+				// обновление аудитории в filteredRooms
+				const index = this.filteredRooms.findIndex(r => r.id === room.id);
+				if (index !== -1) {
+					this.filteredRooms[index] = { ...room };
+				}
+				// обновление или добавление аудитории в filteredRoomsCoords
+				const coordIndex = this.filteredRoomsCoords.findIndex(r => r.id === room.id);
+				if (coordIndex !== -1) {
+					this.filteredRoomsCoords[coordIndex] = { ...room };
+				} else {
+					this.filteredRoomsCoords.push({ ...room });
+				}
+			} else {
+				this.editedRooms.delete(room.id);
+			}
+			// this.editedRooms.add(room.id);
+		},
+
+		areCoordinatesChanged(room) {
+			const originalRoom = this.classrooms.find(r => r.id === room.id);
+			if (!originalRoom || !originalRoom.points || !room.points) return true;
+			if (originalRoom.points.length !== room.points.length) return true;
+			return JSON.stringify(originalRoom.points) !== JSON.stringify(room.points);
 		},
 
 		updateCursorCoordinates(event) {
@@ -607,7 +616,8 @@ export default {
 		updateSnap(event) {
 			if (!this.editingRoom) {
 				this.snapPoint = null;
-				this.snapEdge = null;
+				this.snapEdgeVertical = null;
+				this.snapEdgeHorizontal = null;
 				return;
 			}
 
@@ -618,8 +628,10 @@ export default {
 
 			let closestPoint = null;
 			let closestDistance = Infinity;
-			let closestEdge = null;
-			let closestEdgeDistance = Infinity;
+			let closestVerticalEdge = null;
+			let closestVerticalDistance = Infinity;
+			let closestHorizontalEdge = null;
+			let closestHorizontalDistance = Infinity;
 
 			// проверка всех точек и граней всех аудиторий и зданий
 			const allPoints = [
@@ -636,44 +648,36 @@ export default {
 					closestPoint = point;
 				}
 
-				// проверка грани между текущей точкой и следующей
-				const nextPoint = allPoints[(i + 1) % allPoints.length];
-				if (point.x === nextPoint.x || point.y === nextPoint.y) {
-					const edgeDistance = this.getDistanceToLine(cursorPoint, point, nextPoint);
-					if (edgeDistance < closestEdgeDistance) {
-						closestEdgeDistance = edgeDistance;
-						closestEdge = { start: point, end: nextPoint };
-					}
+				// проверяем вертикальную линию
+				const verticalDistance = Math.abs(x - point.x);
+				if (verticalDistance < closestVerticalDistance) {
+					closestVerticalDistance = verticalDistance;
+					closestVerticalEdge = { x: point.x };
 				}
-				
+				// горизонтальную
+				const horizontalDistance = Math.abs(y - point.y);
+				if (horizontalDistance < closestHorizontalDistance) {
+					closestHorizontalDistance = horizontalDistance;
+					closestHorizontalEdge = { y: point.y };
+				}
 			}
 
 			// проверка притягивания, если расстояние меньше порога
-			if (closestDistance < this.snapThreshold / this.scale) {
+			const snapThesholdScaled = this.snapThreshold / this.scale;
+			if (closestDistance < snapThesholdScaled) {
 				this.snapPoint = closestPoint;
-				this.snapEdge = null;
-			} else if (closestEdgeDistance < this.snapThreshold / this.scale) {
-				this.snapPoint = null;
-				// this.snapEdge = closestEdge;
-				if (closestEdge.start.x === closestEdge.end.x) {
-					// console.log(closestEdge);
-					this.snapEdge = {
-						x1: closestEdge.start.x,
-						y1: -1000,
-						x2: closestEdge.start.x,
-						y2: 3000
-					};
-				} else {
-					this.snapEdge = {
-						x1: -1000,
-						y1: closestEdge.start.y,
-						x2: 3000,
-						y2: closestEdge.start.y
-					};
-				}
+				this.snapEdgeVertical = null;
+				this.snapEdgeHorizontal = null;
 			} else {
 				this.snapPoint = null;
-				this.snapEdge = null;
+				this.snapEdgeVertical =
+					closestVerticalDistance < snapThesholdScaled
+						? closestVerticalEdge
+						: null;
+				this.snapEdgeHorizontal =
+					closestHorizontalDistance < snapThesholdScaled
+						? closestHorizontalEdge
+						: null;
 			}
 		},
 
@@ -682,34 +686,6 @@ export default {
 			const dy = p1.y - p2.y;
 			return Math.sqrt(dx * dx + dy * dy);
 		},
-
-		getDistanceToLine(p, lineStart, lineEnd) {
-			if (lineStart.x === lineEnd.x) {
-				// вертикальная
-				return Math.abs(p.x - lineStart.x);
-			} else if (lineStart.y === lineEnd.y) {
-				// горизонтальная
-				return Math.abs(p.y - lineStart.y);
-			}
-			// ни та, ни другая
-			return Infinity;
-		},
-
-		getClosestLinePoint(start, end, point) {
-			const A = point.x - start.x;
-			const B = point.y - start.y;
-			const C = end.x - start.x;
-			const D = end.y - start.y;
-
-			const dot = A * C + B * D;
-			const lenSq = C * C + D * D;
-			let param = -1;
-			if (lenSq !== 0) {
-				param = dot / lenSq;
-			}
-
-			return Math.max(0, Math.min(1, param));
-		}
 	},
 	mounted() {
 		// при инициализации компонента
