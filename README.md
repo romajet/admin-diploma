@@ -9,6 +9,7 @@ yea
 - [axios](https://axios-http.com/) (лицензия: MIT) — библиотека для выполнения HTTP-запросов.
 - [bcryptjs](https://github.com/dcodeIO/bcrypt.js) (лицензия: MIT) — библиотека для хеширования паролей.
 - [polylabel](https://github.com/mapbox/polylabel) (лицензия: ISC) — вычисление центра тяжести полигонов.
+- [material-icons](https://github.com/marella/material-icons) (лицензия: Apache-2.0) - шрифты иконок и CSS для самостоятельного размещения иконок в стиле Material Design.
 
 ### Development
 - [Vite](https://vitejs.dev/) (лицензия: MIT) — инструмент для сборки.

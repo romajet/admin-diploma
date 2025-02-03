@@ -18,7 +18,7 @@
 							Этаж {{ floor }}
 						</option>
 					</select>
-					<button @click="sendCoordinatesToDatabase" class="send-coords">Отправить изменения</button>
+					<!-- <button @click="sendCoordinatesToDatabase" class="send-coords">Отправить изменения</button> -->
 				</label>
 			</div>
 			<div class="room-table-container">
@@ -38,11 +38,18 @@
 							<td>
 								<div v-if="editingRoom === room.id">
 									<div v-for="(point, index) in getEditingRoom().points" :key="index" class="point-edit">
+										<span class="point-number">{{ index + 1 }}. </span>
 										<input v-model.number="point.x" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
 										<input v-model.number="point.y" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
-										<button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn">Удалить</button>
+										<button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn" title="Удалить вершину">
+											<span class="material-icons btn-icons">remove</span>
+										</button>
+										<!-- <button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn">Удалить</button> -->
 									</div>
-									<button @click="addPoint(getEditingRoom())" class="add-point-btn">Добавить вершину</button>
+									<button @click="addPoint(getEditingRoom())" class="add-point-btn" title="Добавить вершину">
+										<span class="material-icons btn-icons">add</span>
+									</button>
+									<!-- <button @click="addPoint(getEditingRoom())" class="add-point-btn">Добавить вершину</button> -->
 								</div>
 								<div v-else>
 									{{ room.points && room.points.length > 0
@@ -55,12 +62,23 @@
 									v-if="editingRoom === room.id"
 									@click="finishEditing"
 									class="edit-btn"
-								>Завершить</button>
+									title="Сохранить"
+								><span class="material-icons btn-icons">save</span></button>
+								<!-- >Завершить</button> -->
+								<button
+									v-if="editingRoom === room.id"
+									@click="cancelEditing"
+									class="cancel-btn"
+									title="Отменить изменения"
+								><span class="material-icons btn-icons">close</span></button>
+								<!-- >Отменить</button> -->
 								<button
 									v-else
 									@click="startEditing(room)"
 									class="edit-btn"
-								>Редактировать</button>								
+									title="Редактировать"
+								><span class="material-icons btn-icons">edit</span></button>
+								<!-- >Редактировать</button> -->
 							</td>
 						</tr>
 					</tbody>
@@ -125,14 +143,29 @@
 								stroke-width="2"
 								stroke-dasharray="5, 5"
 							/>
-							<circle
+							<g v-for="(point, index) in getEditingRoomPoints()" :key="'point' + index">
+								<circle
+									:cx="point.x"
+									:cy="point.y"
+									r="4"
+									fill="red"
+								/>
+								<text
+									:x="point.x + 10"
+									:y="point.y - 10"
+									fill="red"
+									font-size="12"
+									font-weight="bold"
+								>{{ index + 1 }}</text>
+							</g>
+							<!-- <circle
 								v-for="(point, index) in getEditingRoomPoints()"
 								:key="'point' + index"
 								:cx="point.x"
 								:cy="point.y"
 								r="4"
 								fill="red"
-							/>
+							/> -->
 						</g>
 						<!-- отображение вершин и граней притягивания -->
 						<circle
@@ -374,33 +407,33 @@ export default {
 			// console.log("Доступные этажи: ", this.availableFloors);
 		},
 
-		async sendCoordinatesToDatabase() {
-			try {
-				let updatedCount = 0;
-				for (const roomId of this.editedRooms) {
-					const room = this.filteredRooms.find(r => r.id === roomId);
-					if (room && this.areCoordinatesChanged(room)) {
-						const payload = {
-							Id: room.id,
-							Coordinates: JSON.stringify({points: room.points})
-						};
-						// console.log(payload);
-						await axios.post('/SaveRoomCoordinates', payload);
+		// async sendCoordinatesToDatabase() {
+		// 	try {
+		// 		let updatedCount = 0;
+		// 		for (const roomId of this.editedRooms) {
+		// 			const room = this.filteredRooms.find(r => r.id === roomId);
+		// 			if (room && this.areCoordinatesChanged(room)) {
+		// 				const payload = {
+		// 					Id: room.id,
+		// 					Coordinates: JSON.stringify({points: room.points})
+		// 				};
+		// 				// console.log(payload);
+		// 				await axios.post('/SaveRoomCoordinates', payload);
 						
-						updatedCount++;
-					}
-				}
-				this.editedRooms.clear();
-				if (updatedCount > 0) {
-					alert(`координаты успешно отправлены для ${updatedCount} аудиторий`);
-				} else {
-					alert('нет изменений для сохранения');
-				}
-			} catch (error) {
-				console.error('ошибка при отправке коориднат:', error);
-				alert('ошибка при отпарвке координат');
-			}
-		},
+		// 				updatedCount++;
+		// 			}
+		// 		}
+		// 		this.editedRooms.clear();
+		// 		if (updatedCount > 0) {
+		// 			alert(`координаты успешно отправлены для ${updatedCount} аудиторий`);
+		// 		} else {
+		// 			alert('нет изменений для сохранения');
+		// 		}
+		// 	} catch (error) {
+		// 		console.error('ошибка при отправке коориднат:', error);
+		// 		alert('ошибка при отправке координат');
+		// 	}
+		// },
 
 		updateRooms() {
 			if (this.selectedBuilding) {
@@ -496,13 +529,52 @@ export default {
 			}
 		},
 
-		finishEditing() {
+		async finishEditing() {
 			const editedRoom = this.getEditingRoom();
-			if (editedRoom) {
-				const index = this.filteredRoomsCoords.findIndex(r => r.id === editedRoom.id);
-				index !== -1
-					? this.filteredRoomsCoords[index] = { ...editedRoom }
-					: this.filteredRoomsCoords.push({ ...editedRoom });
+			if (editedRoom && this.areCoordinatesChanged(editedRoom)) {
+				if (!Array.isArray(editedRoom.points) || editedRoom.points.length === 0) {
+					alert('Нельзя сохранить пустые координаты');
+					return;
+				}
+				try {
+					const payload = {
+						Id: editedRoom.id,
+						Coordinates: JSON.stringify({ points: editedRoom.points })
+					};
+					await axios.post('/saveRoomCoordinates', payload);
+
+					// обновление filteredRoomsCoords
+					const index = this.filteredRoomsCoords.findIndex(r => r.id === editedRoom.id);
+					index !== -1
+						? this.filteredRoomsCoords[index] = { ...editedRoom }
+						: this.filteredRoomsCoords.push({ ...editedRoom });
+				} catch (error) {
+					console.error('ошибка при отправке координат: ', error);
+					alert('произошла ошибка при отправке координат');
+				}
+			} else {
+				alert('нет изменений для отправки');
+			}
+			this.editingRoom = null;
+		},
+
+		cancelEditing() {
+			const originalRoom = this.classrooms.find(r => r.id === this.editingRoom);
+			if (originalRoom) {
+				const roomIndex = this.filteredRooms.findIndex(r => r.id === this.editingRoom);
+				if (roomIndex !== -1){
+					this.filteredRooms[roomIndex] = { ...originalRoom };
+				}
+
+				// Update filteredRoomsCoords
+				const coordsIndex = this.filteredRoomsCoords.findIndex(r => r.id === this.editingRoom);
+        		if (coordsIndex !== -1) {
+        			this.filteredRoomsCoords[coordsIndex] = { ...originalRoom };
+        		} else if (Array.isArray(originalRoom.points)) {
+        			this.filteredRoomsCoords.push({ ...originalRoom });
+        		}
+				
+				this.editedRooms.delete(this.editingRoom);
 			}
 			this.editingRoom = null;
 		},
@@ -602,7 +674,10 @@ export default {
 
 		areCoordinatesChanged(room) {
 			const originalRoom = this.classrooms.find(r => r.id === room.id);
-			if (!originalRoom || !originalRoom.points || !room.points) return true;
+			// if (!originalRoom || !originalRoom.points || !room.points) return true;
+			if (!originalRoom || !originalRoom.points) {
+				return Array.isArray(room.points) && room.points.length > 0;
+			}
 			if (originalRoom.points.length !== room.points.length) return true;
 			return JSON.stringify(originalRoom.points) !== JSON.stringify(room.points);
 		},
@@ -824,5 +899,13 @@ export default {
 
 .unsaved-room {
 	background-color: rgba(255, 165, 0, 0.2);
+}
+
+.coord-input {
+	margin-right: 5px;
+}
+
+.btn-icons {
+	font-size: 16px;
 }
 </style>
