@@ -18,7 +18,8 @@ export default {
 			password: "",
 			error: null,
 			// Хэш пароля
-			storedHash: "$2b$12$2TXx0PSjG4rXtmwPdPsXK.BP8XTdZ6cemfU8dTsT7epMy0xR4XvpO",
+			// storedHash: "$2b$12$2TXx0PSjG4rXtmwPdPsXK.BP8XTdZ6cemfU8dTsT7epMy0xR4XvpO",
+			storedHash: "$2b$12$Yr.aCi6J8m5ZTHiaE4psKOHGlmSZ85tOhGN53.MLtVxfiVyzk7PpK",
 			timeoutMinutes: 30, // Тайм-аут в минутах
 		};
 	},

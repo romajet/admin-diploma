@@ -18,15 +18,14 @@
 							Этаж {{ floor }}
 						</option>
 					</select>
-					<!-- <button @click="sendCoordinatesToDatabase" class="send-coords">Отправить изменения</button> -->
 				</label>
 			</div>
 			<div class="room-table-container">
 				<table class="room-table">
 					<thead>
 						<tr>
-							<th>Номер</th>
-							<th>Координаты аудитории</th>
+							<th>Имя</th>
+							<th>Координаты</th>
 							<th>Действия</th>
 						</tr>
 					</thead>
@@ -42,14 +41,12 @@
 										<input v-model.number="point.x" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
 										<input v-model.number="point.y" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
 										<button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn" title="Удалить вершину">
-											<span class="material-icons btn-icons">remove</span>
+											<span class="material-icons btn-icons" style="user-select: none;">remove</span>
 										</button>
-										<!-- <button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn">Удалить</button> -->
 									</div>
 									<button @click="addPoint(getEditingRoom())" class="add-point-btn" title="Добавить вершину">
-										<span class="material-icons btn-icons">add</span>
+										<span class="material-icons btn-icons" style="user-select: none;">add</span>
 									</button>
-									<!-- <button @click="addPoint(getEditingRoom())" class="add-point-btn">Добавить вершину</button> -->
 								</div>
 								<div v-else>
 									{{ room.points && room.points.length > 0
@@ -63,22 +60,19 @@
 									@click="finishEditing"
 									class="edit-btn"
 									title="Сохранить"
-								><span class="material-icons btn-icons">save</span></button>
-								<!-- >Завершить</button> -->
+								><span class="material-icons btn-icons" style="user-select: none;">save</span></button>
 								<button
 									v-if="editingRoom === room.id"
 									@click="cancelEditing"
 									class="cancel-btn"
 									title="Отменить изменения"
-								><span class="material-icons btn-icons">close</span></button>
-								<!-- >Отменить</button> -->
+								><span class="material-icons btn-icons" style="user-select: none;">close</span></button>
 								<button
 									v-else
 									@click="startEditing(room)"
 									class="edit-btn"
 									title="Редактировать"
-								><span class="material-icons btn-icons">edit</span></button>
-								<!-- >Редактировать</button> -->
+								><span class="material-icons btn-icons" style="user-select: none;">edit</span></button>
 							</td>
 						</tr>
 					</tbody>
@@ -86,11 +80,7 @@
 			</div>
 		</div>
 		<div class="right-panel">
-			<!-- <label>
-				<input type="checkbox" v-model="showMap" />
-				Включить карту
-			</label> -->
-			<div v-if="showMap" class="map-container">
+			<div class="map-container">
 				<svg :width="svgWidth" :height="svgHeight"
 					@wheel="handleZoom"
 					@mousedown="startPan"
@@ -134,39 +124,6 @@
 								stroke="black"
 								stroke-width="2" />
 						</g>
-						<!-- отображение вершин и граней аудитории при редактировании -->
-						<g v-if="editingRoom && getEditingRoomPoints().length > 0">
-							<polygon
-								:points="formatPoints(getEditingRoomPoints())"
-								fill="rgba(255, 0, 0, 0.2)"
-								stroke="red"
-								stroke-width="2"
-								stroke-dasharray="5, 5"
-							/>
-							<g v-for="(point, index) in getEditingRoomPoints()" :key="'point' + index">
-								<circle
-									:cx="point.x"
-									:cy="point.y"
-									r="4"
-									fill="red"
-								/>
-								<text
-									:x="point.x + 10"
-									:y="point.y - 10"
-									fill="red"
-									font-size="12"
-									font-weight="bold"
-								>{{ index + 1 }}</text>
-							</g>
-							<!-- <circle
-								v-for="(point, index) in getEditingRoomPoints()"
-								:key="'point' + index"
-								:cx="point.x"
-								:cy="point.y"
-								r="4"
-								fill="red"
-							/> -->
-						</g>
 						<!-- отображение вершин и граней притягивания -->
 						<circle
 							v-if="snapPoint"
@@ -197,6 +154,42 @@
 							stroke-width="2"
 							stroke-dasharray="5, 5"
 						/>
+						<!-- отображение вершин и граней аудитории при редактировании -->
+						<g v-if="editingRoom && getEditingRoomPoints().length > 0">
+							<polygon
+								:points="formatPoints(getEditingRoomPoints())"
+								fill="rgba(255, 0, 0, 0.2)"
+								stroke="red"
+								stroke-width="2"
+								stroke-dasharray="5, 5"
+							/>
+							<g v-for="(point, index) in getEditingRoomPoints()" :key="'point' + index">
+								<circle
+									:cx="point.x"
+									:cy="point.y"
+									r="4"
+									fill="red"
+									@click.stop="removeRoomPoint(index)"
+									style="cursor: pointer;"
+								/>
+								<text
+									:x="point.x + 10"
+									:y="point.y - 10"
+									fill="red"
+									font-size="12"
+									font-weight="bold"
+									style="user-select: none;"
+								>{{ index + 1 }}</text>
+							</g>
+							<!-- <circle
+								v-for="(point, index) in getEditingRoomPoints()"
+								:key="'point' + index"
+								:cx="point.x"
+								:cy="point.y"
+								r="4"
+								fill="red"
+							/> -->
+						</g>
 						<!-- полигоны для регистрации нажатий по аудиториям (для части для юзеров, работает) -->
 						<!-- <g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
 							<polygon
@@ -209,7 +202,9 @@
 					</g>
 				</svg>
 				<div class="cursor-coordinates">
-					{{ cursorX }}, {{ cursorY }}
+					координаты<br>
+					курсора: {{ cursorX }}, {{ cursorY }}<br>
+					точки: {{ realX }}, {{ realY }}
 				</div>
 			</div>
 		</div>
@@ -223,8 +218,6 @@ import polylabel from "polylabel";
 export default {
 	data() {
 		return {
-			// showMap: false,
-			showMap: true,
 			buildings: [],
 			classrooms: [],
 			selectedBuilding: '',
@@ -252,11 +245,17 @@ export default {
 			editedRooms: new Set(),
 			cursorX: 0,
 			cursorY: 0,
+			realX: 0,
+			realY: 0,
 			snapPoint: null,
 			// snapEdge: null,
 			snapEdgeVertical: null,
 			snapEdgeHorizontal: null,
 			snapThreshold: 10,
+			originalRoomPoints: null,
+			clickStartX: 0,
+			clickStartY: 0,
+			clickThreshold: 5,
 		}
 	},
 	// следующий метод будет удален при внедрении
@@ -407,34 +406,6 @@ export default {
 			// console.log("Доступные этажи: ", this.availableFloors);
 		},
 
-		// async sendCoordinatesToDatabase() {
-		// 	try {
-		// 		let updatedCount = 0;
-		// 		for (const roomId of this.editedRooms) {
-		// 			const room = this.filteredRooms.find(r => r.id === roomId);
-		// 			if (room && this.areCoordinatesChanged(room)) {
-		// 				const payload = {
-		// 					Id: room.id,
-		// 					Coordinates: JSON.stringify({points: room.points})
-		// 				};
-		// 				// console.log(payload);
-		// 				await axios.post('/SaveRoomCoordinates', payload);
-						
-		// 				updatedCount++;
-		// 			}
-		// 		}
-		// 		this.editedRooms.clear();
-		// 		if (updatedCount > 0) {
-		// 			alert(`координаты успешно отправлены для ${updatedCount} аудиторий`);
-		// 		} else {
-		// 			alert('нет изменений для сохранения');
-		// 		}
-		// 	} catch (error) {
-		// 		console.error('ошибка при отправке коориднат:', error);
-		// 		alert('ошибка при отправке координат');
-		// 	}
-		// },
-
 		updateRooms() {
 			if (this.selectedBuilding) {
 				this.fetchClassrooms(this.selectedBuilding);
@@ -502,6 +473,8 @@ export default {
 			this.isDragging = false;
 			this.startX = event.clientX - this.panX;
 			this.startY = event.clientY - this.panY;
+			this.clickStartX = event.clientX;
+			this.clickStartY = event.clientY;
 		},
 
 		panMap(event) {
@@ -527,6 +500,7 @@ export default {
 			if (!Array.isArray(room.points)) {
 				room.points = [];
 			}
+			this.originalRoomPoints = JSON.parse(JSON.stringify(room.points));
 		},
 
 		async finishEditing() {
@@ -556,11 +530,13 @@ export default {
 				alert('нет изменений для отправки');
 			}
 			this.editingRoom = null;
+			this.originalRoomPoints = null;
 		},
 
 		cancelEditing() {
 			const originalRoom = this.classrooms.find(r => r.id === this.editingRoom);
 			if (originalRoom) {
+				originalRoom.points = JSON.parse(JSON.stringify(this.originalRoomPoints));
 				const roomIndex = this.filteredRooms.findIndex(r => r.id === this.editingRoom);
 				if (roomIndex !== -1){
 					this.filteredRooms[roomIndex] = { ...originalRoom };
@@ -577,6 +553,7 @@ export default {
 				this.editedRooms.delete(this.editingRoom);
 			}
 			this.editingRoom = null;
+			this.originalRoomPoints = null;
 		},
 
 		getEditingRoomPoints() {
@@ -590,15 +567,14 @@ export default {
 		},
 
 		handleMapClick(event) {
-			if (!this.editingRoom || this.isPanning) return;
-
-			const room = this.getEditingRoom();
-			if (!room) return;
+			// if (!this.editingRoom || this.isPanning) return;
+			if (!this.editingRoom || this.isDragging) return;
 
 			const rect = event.currentTarget.getBoundingClientRect();
 			let x = Math.round((event.clientX - rect.left - this.panX) / this.scale);
 			let y = Math.round((event.clientY - rect.top - this.panY) / this.scale);
 
+			// проверка наличия притягивания
 			if (this.snapPoint) {
 				x = this.snapPoint.x;
 				y = this.snapPoint.y;
@@ -611,12 +587,21 @@ export default {
 				}
 			}
 
-			if (!Array.isArray(room.points)) {
-				room.points = [];
-			}
+			const newPoint = { x, y };
 
-			room.points.push({ x, y });
-			this.updateRoom(room);
+			if (this.editingRoom) {
+				const room = this.getEditingRoom();
+				if (room) {
+					if (!Array.isArray(room.points)) {
+						room.points = [];
+					}
+					const lastPoint = room.points[room.points.length - 1];
+					if (!lastPoint || lastPoint.x !== newPoint.x || lastPoint.y !== newPoint.y) {
+						room.points.push(newPoint);
+						this.updateRoom(room);
+					}
+				}
+			}
 		},
 
 		handleMouseMove(event) {
@@ -626,9 +611,18 @@ export default {
 		},
 
 		handleMouseUp(event) {
-			this.isPanning
-				? this.endPan()
-				: this.handleMapClick(event);
+			if (this.isPanning) {
+				const deltaX = Math.abs(event.clientX - this.clickStartX);
+				const deltaY = Math.abs(event.clientY - this.clickStartY);
+
+				if (deltaX <= this.clickThreshold && deltaY <= this.clickThreshold) {
+					if (this.editingRoom) {
+						this.handleMapClick(event);
+					}
+				}
+
+				this.endPan();
+			}
 		},
 
 		toggleEdit(room) {
@@ -644,6 +638,14 @@ export default {
 			}
 			room.points.push({ x: 0, y: 0 });
 			this.updateRoom(room);
+		},
+
+		removeRoomPoint(index) {
+			const room = this.getEditingRoom();
+			if (room && Array.isArray(room.points)) {
+				room.points.splice(index, 1);
+				this.updateRoom(room);
+			}
 		},
 
 		removePoint(room, index) {
@@ -686,6 +688,19 @@ export default {
 			const rect = event.currentTarget.getBoundingClientRect();
 			this.cursorX = Math.round((event.clientX - rect.left - this.panX) / this.scale);
 			this.cursorY = Math.round((event.clientY - rect.top - this.panY) / this.scale);
+
+			this.realX =
+				this.snapPoint
+					? this.snapPoint.x
+					: (this.snapEdgeVertical
+						? this.snapEdgeVertical.x
+						: this.cursorX);
+			this.realY =
+				this.snapPoint
+					? this.snapPoint.y
+					: (this.snapEdgeHorizontal
+						? this.snapEdgeHorizontal.y
+						: this.cursorY);
 		},
 
 		updateSnap(event) {
@@ -893,7 +908,9 @@ export default {
 	bottom: 0;
 	background-color: rgba(255, 255, 255, 0.7);
 	padding: 5px 10px;
-	font-size: 14px;
+	font-size: 16px;
+	text-align: right;
+	line-height: 1.5;
 	user-select: none;
 }
 
