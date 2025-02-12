@@ -30,21 +30,26 @@
 						</tr>
 					</thead>
 					<tbody>
-						<tr v-for="room in filteredRooms"
-							:key="room.id"
+						<tr v-for="room in filteredRooms" :key="room.id"
 							:class="{ 'active-room': editingRoom === room.id, 'unsaved-room': editedRooms.has(room.id) }">
 							<td>{{ room.number }}</td>
 							<td>
 								<div v-if="editingRoom === room.id">
-									<div v-for="(point, index) in getEditingRoom().points" :key="index" class="point-edit">
+									<div v-for="(point, index) in getEditingRoom().points" :key="index"
+										class="point-edit">
 										<span class="point-number">{{ index + 1 }}. </span>
-										<input v-model.number="point.x" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
-										<input v-model.number="point.y" type="number" class="coord-input" @change="updateRoom(getEditingRoom())" />
-										<button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn" title="Удалить вершину">
-											<span class="material-icons btn-icons" style="user-select: none;">remove</span>
+										<input v-model.number="point.x" type="number" class="coord-input"
+											@change="updateRoom(getEditingRoom())" />
+										<input v-model.number="point.y" type="number" class="coord-input"
+											@change="updateRoom(getEditingRoom())" />
+										<button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn"
+											title="Удалить вершину">
+											<span class="material-icons btn-icons"
+												style="user-select: none;">remove</span>
 										</button>
 									</div>
-									<button @click="addPoint(getEditingRoom())" class="add-point-btn" title="Добавить вершину">
+									<button @click="addPoint(getEditingRoom())" class="add-point-btn"
+										title="Добавить вершину">
 										<span class="material-icons btn-icons" style="user-select: none;">add</span>
 									</button>
 								</div>
@@ -52,27 +57,17 @@
 									{{ room.points && room.points.length > 0
 										? room.points.map(p => `(${p.x},${p.y})`).join(';')
 										: "Координаты отсутствуют" }}
-								</div>								
+								</div>
 							</td>
 							<td>
-								<button
-									v-if="editingRoom === room.id"
-									@click="finishEditing"
-									class="edit-btn"
-									title="Сохранить"
-								><span class="material-icons btn-icons" style="user-select: none;">save</span></button>
-								<button
-									v-if="editingRoom === room.id"
-									@click="cancelEditing"
-									class="cancel-btn"
-									title="Отменить изменения"
-								><span class="material-icons btn-icons" style="user-select: none;">close</span></button>
-								<button
-									v-else
-									@click="startEditing(room)"
-									class="edit-btn"
-									title="Редактировать"
-								><span class="material-icons btn-icons" style="user-select: none;">edit</span></button>
+								<button v-if="editingRoom === room.id" @click="finishEditing" class="edit-btn"
+									title="Сохранить"><span class="material-icons btn-icons"
+										style="user-select: none;">save</span></button>
+								<button v-if="editingRoom === room.id" @click="cancelEditing" class="cancel-btn"
+									title="Отменить изменения"><span class="material-icons btn-icons"
+										style="user-select: none;">close</span></button>
+								<button v-else @click="startEditing(room)" class="edit-btn" title="Редактировать"><span
+										class="material-icons btn-icons" style="user-select: none;">edit</span></button>
 							</td>
 						</tr>
 					</tbody>
@@ -81,114 +76,86 @@
 		</div>
 		<div class="right-panel">
 			<div class="map-container">
-				<svg :width="svgWidth" :height="svgHeight"
-					@wheel="handleZoom"
-					@mousedown="startPan"
-					@mousemove="handleMouseMove"
-					@mouseup="handleMouseUp"
-					@click="handleMapClick"
+				<div class="map-controls" v-if="showMapControls">
+					<button @click="toggleMapControls" class="toggle-controls-btn">
+						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility_off</span>
+					</button>
+					<label>
+						Подложка
+						<input type="checkbox" v-model="showBackground" />
+					</label>
+					<label title="Прозрачность подложки">
+						<span class="material-icons-outlined btn-icons" style="user-select: none;">opacitywallpaper</span>
+						<input type="range" v-model="backgroundOpacity" min="0" max="1" step="0.1" />
+					</label>
+					<label title="Прозрачность элеметов карты">
+						<span class="material-icons-outlined btn-icons" style="user-select: none;">opacitymap</span>
+						<input type="range" v-model="elementsOpacity" min="0" max="1" step="0.1" />
+					</label>
+					<label title="Смещение подложки по оси абсцисс (X)">
+						<span class="material-icons-outlined btn-icons" style="user-select: none;">swap_horiz</span>
+						<input type="number" v-model.number="backgroundOffsetX" />
+					</label>
+					<label title="Смещение подложки по оси ординат (Y)">
+						<span class="material-icons btn-icons" style="user-select: none;">swap_vert</span>
+						<input type="number" v-model.number="backgroundOffsetY" />
+					</label>
+				</div>
+				<div class="map-controls" v-else>
+					<button @click="toggleMapControls" class="toggle-controls-btn">
+						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility</span>
+					</button>
+				</div>
+				<svg :width="svgWidth" :height="svgHeight" @wheel="handleZoom" @mousedown="startPan"
+					@mousemove="handleMouseMove" @mouseup="handleMouseUp" @click="handleMapClick"
 					@contextmenu="preventContextMenu">
 					<!-- группа масштабирования и перемещения -->
 					<g :transform="'translate(' + panX + ', ' + panY + ') scale(' + scale + ')'">
+						<image v-if="showBackground && backgroundImage" :href="backgroundImage" :x="backgroundOffsetX"
+							:y="backgroundOffsetY" :width="backgroundWidth" :height="backgroundHeight"
+							preserve-aspect-ratio="none" :opacity="backgroundOpacity" />
 						<!-- корпус только с заливкой -->
-						<g v-for="(building, index) in filteredBuildings" :key="index">
-							<polygon
-								:points="formatPoints(building.points)"
-								:fill="'gray'"
-								stroke-width="0" />
+						<g :opacity="elementsOpacity">
+							<g v-for="(building, index) in filteredBuildings" :key="index">
+								<polygon :points="formatPoints(building.points)" :fill="'gray'" stroke-width="0" />
+							</g>
 						</g>
 						<!-- аудитории -->
-						<g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
-							<polygon
-								:points="formatPoints(classroom.points)"
-								:fill="getRoomFillColor(classroom)"
-								stroke="blue"
-								stroke-width="1" />
-							<text
-								:x="calculateText(classroom.points).x"
-								:y="calculateText(classroom.points).y"
-								text-anchor="middle"
-								alignment-baseline="middle"
-								font-family="Arial"
-								font-size="14"
-								fill="black"
-								style="user-select: none;">
-								{{ classroom.number }}
-							</text>
+						<g :opacity="elementsOpacity">
+							<g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
+								<polygon :points="formatPoints(classroom.points)" :fill="getRoomFillColor(classroom)"
+									stroke="blue" stroke-width="1" />
+								<text :x="calculateText(classroom.points).x" :y="calculateText(classroom.points).y"
+									text-anchor="middle" alignment-baseline="middle" font-family="Arial" font-size="14"
+									fill="black" style="user-select: none;">
+									{{ classroom.number }}
+								</text>
+							</g>
 						</g>
 						<!-- корпус только с контуром, поверх всего -->
-						<g v-for="(building, index) in filteredBuildings" :key="'outline' + index">
-							<polygon
-								:points="formatPoints(building.points)"
-								:fill="'transparent'"
-								stroke="black"
-								stroke-width="2" />
+						<g :opacity="elementsOpacity">
+							<g v-for="(building, index) in filteredBuildings" :key="'outline' + index">
+								<polygon :points="formatPoints(building.points)" :fill="'transparent'" stroke="black"
+									stroke-width="2" />
+							</g>
 						</g>
 						<!-- отображение вершин и граней притягивания -->
-						<circle
-							v-if="snapPoint"
-							:cx="snapPoint.x"
-							:cy="snapPoint.y"
-							r="6"
-							fill-="none"
-							stroke="green"
-							stroke-width="2"
-						/>
-						<line
-							v-if="snapEdgeVertical"
-							:x1="snapEdgeVertical.x"
-							:y1="-1000"
-							:x2="snapEdgeVertical.x"
-							:y2="3000"
-							stroke="green"
-							stroke-width="2"
-							stroke-dasharray="5, 5"
-						/>
-						<line
-							v-if="snapEdgeHorizontal"
-							:x1="-1000"
-							:y1="snapEdgeHorizontal.y"
-							:x2="3000"
-							:y2="snapEdgeHorizontal.y"
-							stroke="green"
-							stroke-width="2"
-							stroke-dasharray="5, 5"
-						/>
+						<circle v-if="snapPoint" :cx="snapPoint.x" :cy="snapPoint.y" r="6" fill-="none" stroke="green"
+							stroke-width="2" />
+						<line v-if="snapEdgeVertical" :x1="snapEdgeVertical.x" :y1="-1000" :x2="snapEdgeVertical.x"
+							:y2="3000" stroke="green" stroke-width="2" stroke-dasharray="5, 5" />
+						<line v-if="snapEdgeHorizontal" :x1="-1000" :y1="snapEdgeHorizontal.y" :x2="3000"
+							:y2="snapEdgeHorizontal.y" stroke="green" stroke-width="2" stroke-dasharray="5, 5" />
 						<!-- отображение вершин и граней аудитории при редактировании -->
-						<g v-if="editingRoom && getEditingRoomPoints().length > 0">
-							<polygon
-								:points="formatPoints(getEditingRoomPoints())"
-								fill="rgba(255, 0, 0, 0.2)"
-								stroke="red"
-								stroke-width="2"
-								stroke-dasharray="5, 5"
-							/>
+						<g v-if="editingRoom && getEditingRoomPoints().length > 0" :opacity="elementsOpacity">
+							<polygon :points="formatPoints(getEditingRoomPoints())" fill="rgba(255, 0, 0, 0.2)"
+								stroke="red" stroke-width="2" stroke-dasharray="5, 5" />
 							<g v-for="(point, index) in getEditingRoomPoints()" :key="'point' + index">
-								<circle
-									:cx="point.x"
-									:cy="point.y"
-									r="4"
-									fill="red"
-									@click.stop="removeRoomPoint(index)"
-									style="cursor: pointer;"
-								/>
-								<text
-									:x="point.x + 10"
-									:y="point.y - 10"
-									fill="red"
-									font-size="12"
-									font-weight="bold"
-									style="user-select: none;"
-								>{{ index + 1 }}</text>
+								<circle :cx="point.x" :cy="point.y" r="4" fill="red"
+									@click.stop="removeRoomPoint(index)" style="cursor: pointer;" />
+								<text :x="point.x + 10" :y="point.y - 10" fill="red" font-size="12" font-weight="bold"
+									style="user-select: none;">{{ index + 1 }}</text>
 							</g>
-							<!-- <circle
-								v-for="(point, index) in getEditingRoomPoints()"
-								:key="'point' + index"
-								:cx="point.x"
-								:cy="point.y"
-								r="4"
-								fill="red"
-							/> -->
 						</g>
 						<!-- полигоны для регистрации нажатий по аудиториям (для части для юзеров, работает) -->
 						<!-- <g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
@@ -212,6 +179,7 @@
 </template>
 
 <script>
+import { useToast } from "vue-toastification";
 import axios from "../axios";
 import polylabel from "polylabel";
 
@@ -248,7 +216,6 @@ export default {
 			realX: 0,
 			realY: 0,
 			snapPoint: null,
-			// snapEdge: null,
 			snapEdgeVertical: null,
 			snapEdgeHorizontal: null,
 			snapThreshold: 10,
@@ -256,10 +223,21 @@ export default {
 			clickStartX: 0,
 			clickStartY: 0,
 			clickThreshold: 5,
+			showBackground: false,
+			backgroundImage: null,
+			backgroundWidth: 0,
+			backgroundHeight: 0,
+			elementsOpacity: 1,
+			backgroundOpacity: 0.5,
+			backgroundOffsetX: 0,
+			backgroundOffsetY: 0,
+			showMapControls: false,
+			toast: null,
 		}
 	},
 	// следующий метод будет удален при внедрении
 	created() {
+		this.toast = useToast();
 		const isAuthenticated = localStorage.getItem("authenticated") === "true";
 		const loginTimestamp = parseInt(localStorage.getItem("loginTimestamp"), 10);
 		const sessionTimeout = parseInt(localStorage.getItem("sessionTimeout"), 10);
@@ -276,26 +254,27 @@ export default {
 			localStorage.removeItem("loginTimestamp");
 			localStorage.removeItem("sessionTimeout");
 			this.$router.push("/login");
+			this.toast.info("Выход по истечении 30 минут или по кнопке");
 		},
 
 		formatPoints(points) {
 			if (!Array.isArray(points) || points.length === 0) {
-                console.warn("Неверные данные для points:", points);
-                return "";
-            }
-            // console.log(points);
-            return points
-                .map(point => {
-                    // Проверка на наличие координат x и y
-                    if (point && typeof point.x === 'number' && typeof point.y === 'number' && !isNaN(point.x) && !isNaN(point.y)) {
-                        return `${point.x},${point.y}`;
-                    } else {
-                        console.warn("Неверная точка:", point);
-                        return null;
-                    }
-                })
-                .filter(Boolean) // Убираем все null значения
-                .join(" ");
+				// console.warn("Неверные данные для points:", points);
+				return "";
+			}
+			// console.log(points);
+			return points
+				.map(point => {
+					// Проверка на наличие координат x и y
+					if (point && typeof point.x === 'number' && typeof point.y === 'number' && !isNaN(point.x) && !isNaN(point.y)) {
+						return `${point.x},${point.y}`;
+					} else {
+						console.warn("Неверная точка:", point);
+						return null;
+					}
+				})
+				.filter(Boolean) // Убираем все null значения
+				.join(" ");
 		},
 
 		getRoomFillColor(room) {
@@ -305,14 +284,14 @@ export default {
 		},
 
 		getFillColor(name) {
-            if (name) {
-                if (name.includes("Лестница")) return "LightCyan";
-                if (name.includes("Муж")) return "SkyBlue";
-                if (name.includes("Жен")) return "Pink";
-                return "lightblue";
-            }
-            return "lightblue";
-        },
+			if (name) {
+				if (name.includes("Лестница")) return "LightCyan";
+				if (name.includes("Муж")) return "SkyBlue";
+				if (name.includes("Жен")) return "Pink";
+				return "lightblue";
+			}
+			return "lightblue";
+		},
 
 		calculateText(points) {
 			// console.log(points);
@@ -410,6 +389,7 @@ export default {
 			if (this.selectedBuilding) {
 				this.fetchClassrooms(this.selectedBuilding);
 				this.fetchBuildingCoordinates(this.selectedBuilding);
+				this.fetchBackgroundImage();
 				this.filteredRooms = this.classrooms.filter(
 					(room) =>
 						room.buildingId === this.selectedBuilding &&
@@ -538,18 +518,18 @@ export default {
 			if (originalRoom) {
 				originalRoom.points = JSON.parse(JSON.stringify(this.originalRoomPoints));
 				const roomIndex = this.filteredRooms.findIndex(r => r.id === this.editingRoom);
-				if (roomIndex !== -1){
+				if (roomIndex !== -1) {
 					this.filteredRooms[roomIndex] = { ...originalRoom };
 				}
 
 				// Update filteredRoomsCoords
 				const coordsIndex = this.filteredRoomsCoords.findIndex(r => r.id === this.editingRoom);
-        		if (coordsIndex !== -1) {
-        			this.filteredRoomsCoords[coordsIndex] = { ...originalRoom };
-        		} else if (Array.isArray(originalRoom.points)) {
-        			this.filteredRoomsCoords.push({ ...originalRoom });
-        		}
-				
+				if (coordsIndex !== -1) {
+					this.filteredRoomsCoords[coordsIndex] = { ...originalRoom };
+				} else if (Array.isArray(originalRoom.points)) {
+					this.filteredRoomsCoords.push({ ...originalRoom });
+				}
+
 				this.editedRooms.delete(this.editingRoom);
 			}
 			this.editingRoom = null;
@@ -776,11 +756,37 @@ export default {
 			const dy = p1.y - p2.y;
 			return Math.sqrt(dx * dx + dy * dy);
 		},
+
+		async fetchBackgroundImage() {
+			try {
+				const response = await axios.get('/GetPlanForFloor/buildingId/bce65150-c95a-40cb-a59e-9774f5e1b249/floor/1', { responseType: 'blob' });
+				const imageIrl = URL.createObjectURL(response.data);
+				this.backgroundImage = imageIrl;
+
+				const img = new Image();
+				img.onload = () => {
+					this.backgroundWidth = img.width;
+					this.backgroundHeight = img.height;
+				};
+				img.src = imageIrl;
+			} catch (error) {
+				console.error("ошибка при загрузке подложки:", error);
+			}
+		},
+
+		toggleMapControls() {
+			this.showMapControls = !this.showMapControls;
+		}
 	},
 	mounted() {
 		// при инициализации компонента
 		this.fetchBuildings();
 		// console.log(this.buildings);
+	},
+	beforeUnmount() {
+		if (this.backgroundImage) {
+			URL.revokeObjectURL(this.backgroundImage);
+		}
 	},
 	watch: {
 		selectedBuilding(newBuildingId) {
@@ -825,8 +831,6 @@ export default {
 	flex: 1;
 	padding: 20px;
 	padding-right: 10px;
-	/* background-color: #f4f4f4; */
-	/* border-right: 1px solid #ccc; */
 }
 
 .selectors {
@@ -888,13 +892,27 @@ export default {
 }
 
 .map-container {
-	/* margin-top: 20px; */
 	border: 1px solid #ccc;
 	width: 100%;
 	height: 100vh;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	flex-direction: column;
+}
+
+.map-controls {
+	position: absolute;
+	top: 10px;
+	left: 50%;
+	background-color: rgba(255, 255, 255, 0.8);
+	padding: 10px;
+	z-index: 1000;
+}
+
+.map-controls label {
+	display: block;
+	margin-bottom: 5px;
 }
 
 .bottom-selector {

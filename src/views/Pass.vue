@@ -11,6 +11,7 @@
 
 <script>
 import bcrypt from "bcryptjs";
+import { useToast } from "vue-toastification";
 
 export default {
 	data() {
@@ -18,10 +19,13 @@ export default {
 			password: "",
 			error: null,
 			// Хэш пароля
-			// storedHash: "$2b$12$2TXx0PSjG4rXtmwPdPsXK.BP8XTdZ6cemfU8dTsT7epMy0xR4XvpO",
 			storedHash: "$2b$12$Yr.aCi6J8m5ZTHiaE4psKOHGlmSZ85tOhGN53.MLtVxfiVyzk7PpK",
-			timeoutMinutes: 30, // Тайм-аут в минутах
+			timeoutMinutes: 30,
+			toast: null,
 		};
+	},
+	created() {
+		this.toast = useToast();
 	},
 	methods: {
 		login() {
@@ -29,16 +33,17 @@ export default {
 			// Module "crypto" has been externalized for browser compatibility. Cannot access "crypto.randomBytes" in client code.
 			bcrypt.compare(this.password, this.storedHash, (err, result) => {
 				if (result) {
-					// Успешный вход
 					const now = Date.now();
-					const timeout = this.timeoutMinutes * 60 * 1000; // Тайм-аут в миллисекундах
+					const timeout = this.timeoutMinutes * 60 * 1000;
 
 					localStorage.setItem("authenticated", "true");
 					localStorage.setItem("loginTimestamp", now.toString());
 					localStorage.setItem("sessionTimeout", timeout.toString());
 
-					this.$router.push("/"); // Переход на главную
+					this.$router.push("/");
+					this.toast.success("Вход выполнен успешно!");
 				} else {
+					this.toast.error("Неверный пароль!");
 					this.error = "Неверный пароль!";
 				}
 			});
