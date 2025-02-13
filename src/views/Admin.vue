@@ -77,32 +77,42 @@
 		<div class="right-panel">
 			<div class="map-container">
 				<div class="map-controls" v-if="showMapControls">
-					<button @click="toggleMapControls" class="toggle-controls-btn">
+					<!-- <button @click="toggleMapControls" class="toggle-controls-btn">
 						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility_off</span>
-					</button>
-					<label>
+					</button> -->
+					<label style="user-select: none;">
 						Подложка
 						<input type="checkbox" v-model="showBackground" />
 					</label>
+					<label title="Масштаб подложки">
+						<span class="material-icons-outlined btn-icons"
+							style="user-select: none;">zoom_outwallpaper</span>
+						<input type="range" v-model="backgroundScale" min="0.1" max="1" step="0.05" />
+						<input type="number" v-model="backgroundScale" min="0.1" max="1" step="0.05" />
+					</label>
 					<label title="Прозрачность подложки">
-						<span class="material-icons-outlined btn-icons" style="user-select: none;">opacitywallpaper</span>
+						<span class="material-icons-outlined btn-icons"
+							style="user-select: none;">opacitywallpaper</span>
 						<input type="range" v-model="backgroundOpacity" min="0" max="1" step="0.1" />
 					</label>
 					<label title="Прозрачность элеметов карты">
 						<span class="material-icons-outlined btn-icons" style="user-select: none;">opacitymap</span>
 						<input type="range" v-model="elementsOpacity" min="0" max="1" step="0.1" />
 					</label>
-					<label title="Смещение подложки по оси абсцисс (X)">
+					<label title="Смещение подложки по оси абсцисс (X) (больше значение - левее подложка)">
 						<span class="material-icons-outlined btn-icons" style="user-select: none;">swap_horiz</span>
 						<input type="number" v-model.number="backgroundOffsetX" />
 					</label>
-					<label title="Смещение подложки по оси ординат (Y)">
+					<label title="Смещение подложки по оси ординат (Y) (больше значение - ниже подложка)">
 						<span class="material-icons btn-icons" style="user-select: none;">swap_vert</span>
 						<input type="number" v-model.number="backgroundOffsetY" />
 					</label>
+					<button @click="toggleMapControls" class="toggle-controls-btn" title="Скрыть настройки">
+						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility_off</span>
+					</button>
 				</div>
-				<div class="map-controls" v-else>
-					<button @click="toggleMapControls" class="toggle-controls-btn">
+				<div class="map-controls-enable" v-else>
+					<button @click="toggleMapControls" class="toggle-controls-btn" title="Показать настройки">
 						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility</span>
 					</button>
 				</div>
@@ -111,10 +121,15 @@
 					@contextmenu="preventContextMenu">
 					<!-- группа масштабирования и перемещения -->
 					<g :transform="'translate(' + panX + ', ' + panY + ') scale(' + scale + ')'">
+						<!-- начальная точка координат -->
+						<circle cx="0" cy="0" r="4" fill="white" stroke="blue" stroke-width="2" />
+						<text x="-30" y="-10" fill="blue" font-size="12" font-weight="bold">(0, 0)</text>
+						<!-- подложка -->
 						<image v-if="showBackground && backgroundImage" :href="backgroundImage" :x="backgroundOffsetX"
-							:y="backgroundOffsetY" :width="backgroundWidth" :height="backgroundHeight"
-							preserve-aspect-ratio="none" :opacity="backgroundOpacity" />
-						<!-- корпус только с заливкой -->
+							:y="backgroundOffsetY" :width="backgroundWidth * backgroundScale"
+							:height="backgroundHeight * backgroundScale" preserve-aspect-ratio="none"
+							:opacity="backgroundOpacity" />
+						<!-- заливка корпуса -->
 						<g :opacity="elementsOpacity">
 							<g v-for="(building, index) in filteredBuildings" :key="index">
 								<polygon :points="formatPoints(building.points)" :fill="'gray'" stroke-width="0" />
@@ -232,12 +247,14 @@ export default {
 			backgroundOffsetX: 0,
 			backgroundOffsetY: 0,
 			showMapControls: false,
+			backgroundScale: 1,
 			toast: null,
 		}
 	},
-	// следующий метод будет удален при внедрении
 	created() {
 		this.toast = useToast();
+
+		// следующая часть метода будет удалена при внедрении
 		const isAuthenticated = localStorage.getItem("authenticated") === "true";
 		const loginTimestamp = parseInt(localStorage.getItem("loginTimestamp"), 10);
 		const sessionTimeout = parseInt(localStorage.getItem("sessionTimeout"), 10);
@@ -389,7 +406,7 @@ export default {
 			if (this.selectedBuilding) {
 				this.fetchClassrooms(this.selectedBuilding);
 				this.fetchBuildingCoordinates(this.selectedBuilding);
-				this.fetchBackgroundImage();
+				this.fetchBackgroundImage(this.selectedBuilding, this.selectedFloor);
 				this.filteredRooms = this.classrooms.filter(
 					(room) =>
 						room.buildingId === this.selectedBuilding &&
@@ -703,6 +720,25 @@ export default {
 			let closestHorizontalEdge = null;
 			let closestHorizontalDistance = Infinity;
 
+			const zeroPoint = { x: 0, y: 0 };
+			const zeroDistance = this.getDistance(cursorPoint, zeroPoint);
+			if (zeroDistance < closestDistance) {
+				closestDistance = zeroDistance;
+				closestPoint = zeroPoint;
+			}
+
+			const verticalDistanceZero = Math.abs(x);
+			if (verticalDistanceZero < closestVerticalDistance) {
+				closestVerticalDistance = verticalDistanceZero;
+				closestVerticalEdge = { x: 0 };
+			}
+
+			const horizontalDistanceZero = Math.abs(y);
+			if (horizontalDistanceZero < closestHorizontalDistance) {
+				closestHorizontalDistance = horizontalDistanceZero;
+				closestHorizontalEdge = { y: 0 };
+			}
+
 			// проверка всех точек и граней всех аудиторий и зданий
 			const allPoints = [
 				...this.filteredRoomsCoords.flatMap(room => room.points),
@@ -757,9 +793,9 @@ export default {
 			return Math.sqrt(dx * dx + dy * dy);
 		},
 
-		async fetchBackgroundImage() {
+		async fetchBackgroundImage(selectedBuilding, selectedFloor) {
 			try {
-				const response = await axios.get('/GetPlanForFloor/buildingId/bce65150-c95a-40cb-a59e-9774f5e1b249/floor/1', { responseType: 'blob' });
+				const response = await axios.get(`/GetPlanForFloor/buildingId/${selectedBuilding}/floor/${selectedFloor}`, { responseType: 'blob' });
 				const imageIrl = URL.createObjectURL(response.data);
 				this.backgroundImage = imageIrl;
 
@@ -903,7 +939,7 @@ export default {
 
 .map-controls {
 	position: absolute;
-	top: 10px;
+	bottom: 11px;
 	left: 50%;
 	background-color: rgba(255, 255, 255, 0.8);
 	padding: 10px;
@@ -913,6 +949,12 @@ export default {
 .map-controls label {
 	display: block;
 	margin-bottom: 5px;
+}
+
+.map-controls-enable {
+	position: absolute;
+	bottom: 21px;
+	left: calc(50% + 10px);
 }
 
 .bottom-selector {
