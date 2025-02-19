@@ -54,9 +54,9 @@
 									</button>
 								</div>
 								<div v-else>
-									{{ room.points && room.points.length > 0
+									{{room.points && room.points.length > 0
 										? room.points.map(p => `(${p.x},${p.y})`).join(';')
-										: "Координаты отсутствуют" }}
+										: "Координаты отсутствуют"}}
 								</div>
 							</td>
 							<td>
@@ -84,12 +84,12 @@
 						Подложка
 						<input type="checkbox" v-model="showBackground" />
 					</label>
-					<label title="Масштаб подложки">
+					<!-- <label title="Масштаб подложки">
 						<span class="material-icons-outlined btn-icons"
 							style="user-select: none;">zoom_outwallpaper</span>
 						<input type="range" v-model="backgroundScale" min="0.1" max="1" step="0.05" />
-						<input type="number" v-model="backgroundScale" min="0.1" max="1" step="0.05" />
-					</label>
+						<input type="number" v-model="backgroundScale" min="0.1" max="1" step="0.01" />
+					</label> -->
 					<label title="Прозрачность подложки">
 						<span class="material-icons-outlined btn-icons"
 							style="user-select: none;">opacitywallpaper</span>
@@ -107,8 +107,12 @@
 						<span class="material-icons btn-icons" style="user-select: none;">swap_vert</span>
 						<input type="number" v-model.number="backgroundOffsetY" />
 					</label>
-					<button @click="toggleMapControls" class="toggle-controls-btn" title="Скрыть настройки">
+					<button @click="toggleMapControls" class="toggle-controls-btn coord-input" title="Скрыть настройки">
 						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility_off</span>
+					</button>
+					<button @click="() => { this.panX = 10; this.panY = 10; this.scale = 1; }"
+						class="toggle-controls-btn" title="Положение по умолчанию">
+						<span class="material-icons-outlined btn-icons" style="user-select: none;">crop_free</span>
 					</button>
 				</div>
 				<div class="map-controls-enable" v-else>
@@ -136,13 +140,13 @@
 							</g>
 						</g>
 						<!-- аудитории -->
-						<g :opacity="elementsOpacity">
+						<g>
 							<g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
 								<polygon :points="formatPoints(classroom.points)" :fill="getRoomFillColor(classroom)"
-									stroke="blue" stroke-width="1" />
+									stroke="blue" stroke-width="1" :opacity="elementsOpacity" />
 								<text :x="calculateText(classroom.points).x" :y="calculateText(classroom.points).y"
 									text-anchor="middle" alignment-baseline="middle" font-family="Arial" font-size="14"
-									fill="black" style="user-select: none;">
+									fill="black" style="user-select: none;" :opacity="elementsOpacity > 0 ? 1 : 0">
 									{{ classroom.number }}
 								</text>
 							</g>
@@ -162,7 +166,7 @@
 						<line v-if="snapEdgeHorizontal" :x1="-1000" :y1="snapEdgeHorizontal.y" :x2="3000"
 							:y2="snapEdgeHorizontal.y" stroke="green" stroke-width="2" stroke-dasharray="5, 5" />
 						<!-- отображение вершин и граней аудитории при редактировании -->
-						<g v-if="editingRoom && getEditingRoomPoints().length > 0" :opacity="elementsOpacity">
+						<g v-if="editingRoom && getEditingRoomPoints().length > 0">
 							<polygon :points="formatPoints(getEditingRoomPoints())" fill="rgba(255, 0, 0, 0.2)"
 								stroke="red" stroke-width="2" stroke-dasharray="5, 5" />
 							<g v-for="(point, index) in getEditingRoomPoints()" :key="'point' + index">
@@ -211,8 +215,8 @@ export default {
 			filteredRooms: [],
 			filteredRoomsCoords: [],
 			scale: 1,
-			panX: 0,
-			panY: 0,
+			panX: 10,
+			panY: 10,
 			startX: 0,
 			startY: 0,
 			isPanning: false,
@@ -238,16 +242,16 @@ export default {
 			clickStartX: 0,
 			clickStartY: 0,
 			clickThreshold: 5,
-			showBackground: false,
+			showBackground: true,
 			backgroundImage: null,
 			backgroundWidth: 0,
 			backgroundHeight: 0,
-			elementsOpacity: 1,
-			backgroundOpacity: 0.5,
+			elementsOpacity: 0.5,
+			backgroundOpacity: 0.4,
 			backgroundOffsetX: 0,
 			backgroundOffsetY: 0,
-			showMapControls: false,
-			backgroundScale: 1,
+			showMapControls: true,
+			backgroundScale: 0.25,
 			toast: null,
 		}
 	},
@@ -273,6 +277,11 @@ export default {
 			this.$router.push("/login");
 			this.toast.info("Выход по истечении 30 минут или по кнопке");
 		},
+
+		// goToZero() {
+		// 	this.panX = 10;
+		// 	this.panY = 10;
+		// },
 
 		formatPoints(points) {
 			if (!Array.isArray(points) || points.length === 0) {
@@ -332,10 +341,10 @@ export default {
 			}
 		},
 
-		async fetchBuildingCoordinates(buildingId) {
+		async fetchBuildingCoordinates(buildingId, selectedFloor) {
 			try {
 				const res = await axios.get(
-					`/buildingcoordinates/buildingId/${buildingId}/floor/1`
+					`/buildingcoordinates/buildingId/${buildingId}/floor/${selectedFloor}`
 				);
 				const buildingData = res.data ? JSON.parse(res.data) : null;
 
@@ -405,8 +414,11 @@ export default {
 		updateRooms() {
 			if (this.selectedBuilding) {
 				this.fetchClassrooms(this.selectedBuilding);
-				this.fetchBuildingCoordinates(this.selectedBuilding);
-				this.fetchBackgroundImage(this.selectedBuilding, this.selectedFloor);
+				this.filteredBuildings = [];
+				if (this.selectedFloor) {
+					this.fetchBuildingCoordinates(this.selectedBuilding, this.selectedFloor);
+					this.fetchBackgroundImage(this.selectedBuilding, this.selectedFloor);
+				}
 				this.filteredRooms = this.classrooms.filter(
 					(room) =>
 						room.buildingId === this.selectedBuilding &&
@@ -519,12 +531,16 @@ export default {
 					index !== -1
 						? this.filteredRoomsCoords[index] = { ...editedRoom }
 						: this.filteredRoomsCoords.push({ ...editedRoom });
+
+					this.toast.success('Координаты успешно отправлены');
 				} catch (error) {
 					console.error('ошибка при отправке координат: ', error);
-					alert('произошла ошибка при отправке координат');
+					this.toast.error('произошла ошибка при отправке координат');
+					// alert('произошла ошибка при отправке координат');
 				}
 			} else {
-				alert('нет изменений для отправки');
+				// alert('нет изменений для отправки');
+				this.toast.error('нет изменений для отправки');
 			}
 			this.editingRoom = null;
 			this.originalRoomPoints = null;
@@ -942,7 +958,9 @@ export default {
 	bottom: 11px;
 	left: 50%;
 	background-color: rgba(255, 255, 255, 0.8);
-	padding: 10px;
+	margin: 10px;
+	padding: 10px 10px 0 0;
+	/* padding: 10px; */
 	z-index: 1000;
 }
 
