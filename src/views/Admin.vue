@@ -30,6 +30,50 @@
 						</tr>
 					</thead>
 					<tbody>
+						<!-- корпус -->
+						<tr v-if="selectedFloor"
+							:class="{ 'active-room': editingFloor, 'unsaved-room': isFloorUnsaved }">
+							<td>Этаж</td>
+							<td>
+								<div v-if="editingFloor">
+									<div v-for="(point, index) in getEditingFloorPoints()" :key="index"
+										class="point-edit">
+										<span class="point-number">{{ index + 1 }}. </span>
+										<input v-model.number="point.x" type="number" class="coord-input"
+											@change="updateFloor()" />
+										<input v-model.number="point.y" type="number" class="coord-input"
+											@change="updateFloor()" />
+										<button @click="removeFloorPoint(index)" class="remove-point-btn"
+											title="Удалить вершину">
+											<span class="material-icons btn-icons"
+												style="user-select: none;">remove</span>
+										</button>
+									</div>
+									<button @click="addFloorPoint()" class="add-point-btn" title="Добавить вершину">
+										<span class="material-icons btn-icons" style="user-select: none;">add</span>
+									</button>
+								</div>
+								<div v-else>
+									{{getEditingFloorPoints() && getEditingFloorPoints().length > 0
+									? getEditingFloorPoints().map(p => `(${p.x},${p.y})`).join(';')
+									: 'координаты отсутствуют'}}
+								</div>
+							</td>
+							<td>
+								<button v-if="editingFloor" @click="finishEditingFloor" class="edit-btn"
+									title="Сохранить">
+									<span class="material-icons btn-icons" style="user-select: none;">save</span>
+								</button>
+								<button v-if="editingFloor" @click="cancelEditingFloor" class="cancel-btn"
+									title="Отменить изменения">
+									<span class="material-icons btn-icons" style="user-select: none;">close</span>
+								</button>
+								<button v-else @click="startEditingFloor" class="edit-btn" title="Редактировать">
+									<span class="material-icons btn-icons" style="user-select: none;">edit</span>
+								</button>
+							</td>
+						</tr>
+						<!-- аудитории -->
 						<tr v-for="room in filteredRooms" :key="room.id"
 							:class="{ 'active-room': editingRoom === room.id, 'unsaved-room': editedRooms.has(room.id) }">
 							<td>{{ room.number }}</td>
@@ -55,19 +99,22 @@
 								</div>
 								<div v-else>
 									{{room.points && room.points.length > 0
-										? room.points.map(p => `(${p.x},${p.y})`).join(';')
-										: "Координаты отсутствуют"}}
+									? room.points.map(p => `(${p.x},${p.y})`).join(';')
+									: "Координаты отсутствуют"}}
 								</div>
 							</td>
 							<td>
 								<button v-if="editingRoom === room.id" @click="finishEditing" class="edit-btn"
-									title="Сохранить"><span class="material-icons btn-icons"
-										style="user-select: none;">save</span></button>
+									title="Сохранить">
+									<span class="material-icons btn-icons" style="user-select: none;">save</span>
+								</button>
 								<button v-if="editingRoom === room.id" @click="cancelEditing" class="cancel-btn"
-									title="Отменить изменения"><span class="material-icons btn-icons"
-										style="user-select: none;">close</span></button>
-								<button v-else @click="startEditing(room)" class="edit-btn" title="Редактировать"><span
-										class="material-icons btn-icons" style="user-select: none;">edit</span></button>
+									title="Отменить изменения">
+									<span class="material-icons btn-icons" style="user-select: none;">close</span>
+								</button>
+								<button v-else @click="startEditing(room)" class="edit-btn" title="Редактировать">
+									<span class="material-icons btn-icons" style="user-select: none;">edit</span>
+								</button>
 							</td>
 						</tr>
 					</tbody>
@@ -106,6 +153,9 @@
 					<label title="Смещение подложки по оси ординат (Y) (больше значение - ниже подложка)">
 						<span class="material-icons btn-icons" style="user-select: none;">swap_vert</span>
 						<input type="number" v-model.number="backgroundOffsetY" />
+					</label>
+					<label>
+						<b>Зажатие Alt отключает притягивание</b>
 					</label>
 					<button @click="toggleMapControls" class="toggle-controls-btn coord-input" title="Скрыть настройки">
 						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility_off</span>
@@ -176,6 +226,16 @@
 									style="user-select: none;">{{ index + 1 }}</text>
 							</g>
 						</g>
+						<!-- отображение вершин и граней корпуса при редактировании -->
+						<g v-if="editingFloor && getEditingFloorPoints().length > 0">
+							<polygon :points="formatPoints(getEditingFloorPoints())" fill="rgba(0, 255, 0, 0.2)"
+								stroke="green" stroke-width="2" stroke-dasharray="5,5" />
+							<g v-for="(point, index) in getEditingFloorPoints()" :key="'floorPoint' + index">
+								<circle :cx="point.x" :cy="point.y" r="4" fill="green" />
+								<text :x="point.x + 10" :y="point.y - 10" fill="green" font-size="12"
+									font-weight="bold">{{ index + 1 }}</text>
+							</g>
+						</g>
 						<!-- полигоны для регистрации нажатий по аудиториям (для части для юзеров, работает) -->
 						<!-- <g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
 							<polygon
@@ -214,6 +274,7 @@ export default {
 			availableFloors: [],
 			filteredRooms: [],
 			filteredRoomsCoords: [],
+
 			scale: 1,
 			panX: 10,
 			panY: 10,
@@ -222,26 +283,34 @@ export default {
 			isPanning: false,
 			isDragging: false,
 			dragThreshold: 5,
-			initialTouchDistance: null,
-			initialScale: 1,
+
 			minScale: 0.2,
 			maxScale: 5,
+
 			svgWidth: "100%",
 			svgHeight: "100%",
+
 			editingRoom: null,
 			editedRooms: new Set(),
 			cursorX: 0,
 			cursorY: 0,
 			realX: 0,
 			realY: 0,
+
 			snapPoint: null,
 			snapEdgeVertical: null,
 			snapEdgeHorizontal: null,
 			snapThreshold: 10,
+
 			originalRoomPoints: null,
+			originalFloorPoints: null,
+			isFloorUnsaved: false,
+			editingFloor: false,
+
 			clickStartX: 0,
 			clickStartY: 0,
-			clickThreshold: 5,
+			clickThreshold: 10,
+
 			showBackground: true,
 			backgroundImage: null,
 			backgroundWidth: 0,
@@ -252,7 +321,10 @@ export default {
 			backgroundOffsetY: 0,
 			showMapControls: true,
 			backgroundScale: 0.25,
+
 			toast: null,
+
+			isAltPressed: false,
 		}
 	},
 	created() {
@@ -397,19 +469,23 @@ export default {
 				});
 
 				// извлечение этажей
-				this.extractFloors();
+				// this.extractFloors();
+				this.availableFloors = [
+					...new Set(this.classrooms.map((classroom) => classroom.floor)),
+				].sort((a, b) => a - b);
+				// console.log("Доступные этажи: ", this.availableFloors);
 			} catch (error) {
 				console.error("Ошибка загрузки аудиторий: ", error);
 			}
 		},
 
-		extractFloors() {
-			// извлечение этажей из аудиторий
-			this.availableFloors = [
-				...new Set(this.classrooms.map((classroom) => classroom.floor)),
-			].sort((a, b) => a - b);
-			// console.log("Доступные этажи: ", this.availableFloors);
-		},
+		// extractFloors() {
+		// 	// извлечение этажей из аудиторий
+		// 	this.availableFloors = [
+		// 		...new Set(this.classrooms.map((classroom) => classroom.floor)),
+		// 	].sort((a, b) => a - b);
+		// 	// console.log("Доступные этажи: ", this.availableFloors);
+		// },
 
 		updateRooms() {
 			if (this.selectedBuilding) {
@@ -504,8 +580,18 @@ export default {
 			this.isPanning = false;
 		},
 
+		saveCurrentEditing() {
+			if (this.editingFloor) {
+				this.finishEditingFloor();
+			} else if (this.editingRoom) {
+				this.finishEditing();
+			}
+		},
+
 		startEditing(room) {
+			this.saveCurrentEditing();
 			this.editingRoom = room.id;
+			this.editingFloor = false;
 			if (!Array.isArray(room.points)) {
 				room.points = [];
 			}
@@ -532,6 +618,13 @@ export default {
 						? this.filteredRoomsCoords[index] = { ...editedRoom }
 						: this.filteredRoomsCoords.push({ ...editedRoom });
 
+					const classroomIndex = this.classrooms.findIndex(r => r.id === editedRoom.id);
+					if (classroomIndex !== -1) {
+						this.classrooms[classroomIndex] = { ...editedRoom };
+					}
+
+					// this.editedRooms.delete(editedRoom.id);
+
 					this.toast.success('Координаты успешно отправлены');
 				} catch (error) {
 					console.error('ошибка при отправке координат: ', error);
@@ -547,20 +640,20 @@ export default {
 		},
 
 		cancelEditing() {
-			const originalRoom = this.classrooms.find(r => r.id === this.editingRoom);
-			if (originalRoom) {
-				originalRoom.points = JSON.parse(JSON.stringify(this.originalRoomPoints));
+			const editingRoom = this.getEditingRoom();
+			if (editingRoom) {
+				editingRoom.points = JSON.parse(JSON.stringify(this.originalRoomPoints));
 				const roomIndex = this.filteredRooms.findIndex(r => r.id === this.editingRoom);
 				if (roomIndex !== -1) {
-					this.filteredRooms[roomIndex] = { ...originalRoom };
+					this.filteredRooms[roomIndex] = { ...editingRoom };
 				}
 
 				// Update filteredRoomsCoords
 				const coordsIndex = this.filteredRoomsCoords.findIndex(r => r.id === this.editingRoom);
 				if (coordsIndex !== -1) {
-					this.filteredRoomsCoords[coordsIndex] = { ...originalRoom };
-				} else if (Array.isArray(originalRoom.points)) {
-					this.filteredRoomsCoords.push({ ...originalRoom });
+					this.filteredRoomsCoords[coordsIndex] = { ...editingRoom };
+				} else if (Array.isArray(editingRoom.points)) {
+					this.filteredRoomsCoords.push({ ...editingRoom });
 				}
 
 				this.editedRooms.delete(this.editingRoom);
@@ -581,7 +674,7 @@ export default {
 
 		handleMapClick(event) {
 			// if (!this.editingRoom || this.isPanning) return;
-			if (!this.editingRoom || this.isDragging) return;
+			if ((!this.editingRoom && !this.editingFloor) || this.isDragging) return;
 
 			const rect = event.currentTarget.getBoundingClientRect();
 			let x = Math.round((event.clientX - rect.left - this.panX) / this.scale);
@@ -614,6 +707,14 @@ export default {
 						this.updateRoom(room);
 					}
 				}
+			} else if (this.editingFloor) {
+				if (this.filteredBuildings.length > 0) {
+					const lastPoint = this.filteredBuildings[0].points[this.filteredBuildings[0].points.length - 1];
+					if (!lastPoint || lastPoint.x !== newPoint.x || lastPoint.y !== newPoint.y) {
+						this.filteredBuildings[0].points.push(newPoint);
+						this.updateFloor();
+					}
+				}
 			}
 		},
 
@@ -629,20 +730,13 @@ export default {
 				const deltaY = Math.abs(event.clientY - this.clickStartY);
 
 				if (deltaX <= this.clickThreshold && deltaY <= this.clickThreshold) {
-					if (this.editingRoom) {
+					if (this.editingRoom || this.editingFloor) {
 						this.handleMapClick(event);
 					}
 				}
 
 				this.endPan();
 			}
-		},
-
-		toggleEdit(room) {
-			if (room.isEditing) {
-				this.editedRooms.add(room.id);
-			}
-			room.isEditing = !room.isEditing;
 		},
 
 		addPoint(room) {
@@ -684,17 +778,16 @@ export default {
 			} else {
 				this.editedRooms.delete(room.id);
 			}
-			// this.editedRooms.add(room.id);
 		},
 
 		areCoordinatesChanged(room) {
-			const originalRoom = this.classrooms.find(r => r.id === room.id);
-			// if (!originalRoom || !originalRoom.points || !room.points) return true;
-			if (!originalRoom || !originalRoom.points) {
-				return Array.isArray(room.points) && room.points.length > 0;
+			if (!this.originalRoomPoints) {
+				return false;
 			}
-			if (originalRoom.points.length !== room.points.length) return true;
-			return JSON.stringify(originalRoom.points) !== JSON.stringify(room.points);
+			if (room.points.length !== this.originalRoomPoints.length) {
+				return true;
+			}
+			return JSON.stringify(room.points) !== JSON.stringify(this.originalRoomPoints);
 		},
 
 		updateCursorCoordinates(event) {
@@ -716,8 +809,22 @@ export default {
 						: this.cursorY);
 		},
 
+		handleKeyDown(event) {
+			if (event.key === 'Alt') {
+				event.preventDefault();
+				this.isAltPressed = true;
+			}
+		},
+
+		handleKeyUp(event) {
+			if (event.key === 'Alt') {
+				event.preventDefault();
+				this.isAltPressed = false;
+			}
+		},
+
 		updateSnap(event) {
-			if (!this.editingRoom) {
+			if ((!this.editingRoom && !this.editingFloor) || this.isAltPressed) {
 				this.snapPoint = null;
 				this.snapEdgeVertical = null;
 				this.snapEdgeHorizontal = null;
@@ -809,6 +916,94 @@ export default {
 			return Math.sqrt(dx * dx + dy * dy);
 		},
 
+		async fetchFloorCoordinates(buildingId, floor) {
+			try {
+				const res = await axios.get(`/buildingcoordinates/buildingId/${buildingId}/floor/${floor}`);
+				const floorData = res.data ? JSON.parse(res.data) : null;
+				if (floorData && Array.isArray(floorData.points)) {
+					this.filteredBuildings = [{
+						buildingId: buildingId,
+						floor: floor,
+						points: floorData.points
+					}];
+				} else {
+					this.filteredBuildings = [{
+						buildingId: buildingId,
+						floor: floor,
+						points: []
+					}];
+				}
+			} catch (error) {
+				console.error("ошибка загрузки координат этажа: ", error);
+				this.filteredBuildings = [{
+					buildingId: buildingId,
+					floor: floor,
+					points: []
+				}];
+			}
+		},
+
+		startEditingFloor() {
+			this.saveCurrentEditing();
+			this.editingFloor = true;
+			this.editingRoom = null;
+			this.originalFloorPoints = JSON.parse(JSON.stringify(this.getEditingFloorPoints()));
+		},
+
+		async finishEditingFloor() {
+			if (this.areFloorCoordinatesChanged()) {
+				try {
+					const payload = {
+						BuildingId: this.selectedBuilding,
+						Floor: this.selectedFloor,
+						Coordinates: JSON.stringify({ points: this.getEditingFloorPoints() })
+					};
+					await axios.post('/SaveBuildingFloorCoordinates', payload);
+					this.isFloorUnsaved = false;
+					this.toast.success('координаты этажа корпуса успешно отправлены');
+				} catch (error) {
+					console.error('ошибка отправки координат этажа: ', error);
+					this.toast.error('ошибка отправки координат этажа');
+				}
+			} else {
+				this.toast.info('нет изменений для сохранения');
+			}
+			this.editingFloor = false;
+		},
+
+		cancelEditingFloor() {
+			if (this.filteredBuildings.length > 0) {
+				this.filteredBuildings[0].points = JSON.parse(JSON.stringify(this.originalFloorPoints));
+			}
+			this.editingFloor = false;
+		},
+
+		areFloorCoordinatesChanged() {
+			return JSON.stringify(this.getEditingFloorPoints()) !== JSON.stringify(this.originalFloorPoints);
+		},
+
+		getEditingFloorPoints() {
+			return this.filteredBuildings.length > 0 ? this.filteredBuildings[0].points : [];
+		},
+
+		addFloorPoint() {
+			if (this.filteredBuildings.length > 0) {
+				this.filteredBuildings[0].points.push({ x: 0, y: 0 });
+				this.updateFloor();
+			}
+		},
+
+		removeFloorPoint(index) {
+			if (this.filteredBuildings.length > 0) {
+				this.filteredBuildings[0].points.splice(index, 1);
+				this.updateFloor();
+			}
+		},
+
+		updateFloor() {
+			this.isFloorUnsaved = true;
+		},
+
 		async fetchBackgroundImage(selectedBuilding, selectedFloor) {
 			try {
 				const response = await axios.get(`/GetPlanForFloor/buildingId/${selectedBuilding}/floor/${selectedFloor}`, { responseType: 'blob' });
@@ -834,11 +1029,15 @@ export default {
 		// при инициализации компонента
 		this.fetchBuildings();
 		// console.log(this.buildings);
+		window.addEventListener('keydown', this.handleKeyDown);
+		window.addEventListener('keyup', this.handleKeyUp);
 	},
 	beforeUnmount() {
 		if (this.backgroundImage) {
 			URL.revokeObjectURL(this.backgroundImage);
 		}
+		window.removeEventListener('keydown', this.handleKeyDown);
+		window.removeEventListener('keyup', this.handleKeyUp);
 	},
 	watch: {
 		selectedBuilding(newBuildingId) {
@@ -854,8 +1053,11 @@ export default {
 
 			this.updateRooms();
 		},
-		selectedFloor() {
-			this.updateRooms();
+		selectedFloor(newFloor) {
+			if (this.selectedBuilding && newFloor) {
+				this.fetchFloorCoordinates(this.selectedBuilding, newFloor);
+				this.updateRooms();
+			}
 		},
 	},
 };
