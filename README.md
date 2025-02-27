@@ -9,9 +9,9 @@ yea
 - *[Vue.js](https://vuejs.org/) (лицензия: MIT) — фреймворк для построения пользовательских интерфейсов.*
 - *[Vue Router](https://router.vuejs.org/) (лицензия: MIT) — маршрутизация для Vue.*
 - *[axios](https://axios-http.com/) (лицензия: MIT) — библиотека для выполнения HTTP-запросов.*
-- [bcryptjs](https://github.com/dcodeIO/bcrypt.js) (лицензия: MIT) — библиотека для хеширования паролей.
 - *[polylabel](https://github.com/mapbox/polylabel) (лицензия: ISC) — вычисление центра тяжести полигонов.*
-- *[material-icons](https://github.com/marella/material-icons) (лицензия: Apache-2.0) - шрифты иконок и CSS для самостоятельного размещения иконок в стиле Material Design.*
+- *[Tabler Icons](https://github.com/tabler/tabler-icons) (лицензия: MIT) — набор иконок в SVG-формате.*
+- [bcryptjs](https://github.com/dcodeIO/bcrypt.js) (лицензия: MIT) — библиотека для хеширования паролей.
 
 ### Development
 - *[Vite](https://vitejs.dev/) (лицензия: MIT) — инструмент для сборки.*

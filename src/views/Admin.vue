@@ -45,31 +45,30 @@
 											@change="updateFloor()" />
 										<button @click="removeFloorPoint(index)" class="remove-point-btn"
 											title="Удалить вершину">
-											<span class="material-icons btn-icons"
-												style="user-select: none;">remove</span>
+											<IconMinus class="btn-icons" />
 										</button>
 									</div>
 									<button @click="addFloorPoint()" class="add-point-btn" title="Добавить вершину">
-										<span class="material-icons btn-icons" style="user-select: none;">add</span>
+										<IconPlus class="btn-icons" />
 									</button>
 								</div>
 								<div v-else>
 									{{getEditingFloorPoints() && getEditingFloorPoints().length > 0
-									? getEditingFloorPoints().map(p => `(${p.x},${p.y})`).join(';')
-									: 'координаты отсутствуют'}}
+										? getEditingFloorPoints().map(p => `(${p.x},${p.y})`).join(';')
+										: 'координаты отсутствуют'}}
 								</div>
 							</td>
-							<td>
+							<td class="action-cell">
 								<button v-if="editingFloor" @click="finishEditingFloor" class="edit-btn"
 									title="Сохранить">
-									<span class="material-icons btn-icons" style="user-select: none;">save</span>
+									<IconDeviceFloppy />
 								</button>
 								<button v-if="editingFloor" @click="cancelEditingFloor" class="cancel-btn"
 									title="Отменить изменения">
-									<span class="material-icons btn-icons" style="user-select: none;">close</span>
+									<IconArrowBackUp />
 								</button>
 								<button v-else @click="startEditingFloor" class="edit-btn" title="Редактировать">
-									<span class="material-icons btn-icons" style="user-select: none;">edit</span>
+									<IconEdit />
 								</button>
 							</td>
 						</tr>
@@ -88,32 +87,31 @@
 											@change="updateRoom(getEditingRoom())" />
 										<button @click="removePoint(getEditingRoom(), index)" class="remove-point-btn"
 											title="Удалить вершину">
-											<span class="material-icons btn-icons"
-												style="user-select: none;">remove</span>
+											<IconMinus class="btn-icons" />
 										</button>
 									</div>
 									<button @click="addPoint(getEditingRoom())" class="add-point-btn"
 										title="Добавить вершину">
-										<span class="material-icons btn-icons" style="user-select: none;">add</span>
+										<IconPlus class="btn-icons" />
 									</button>
 								</div>
 								<div v-else>
 									{{room.points && room.points.length > 0
-									? room.points.map(p => `(${p.x},${p.y})`).join(';')
-									: "Координаты отсутствуют"}}
+										? room.points.map(p => `(${p.x},${p.y})`).join(';')
+										: "Координаты отсутствуют"}}
 								</div>
 							</td>
-							<td>
+							<td class="action-cell">
 								<button v-if="editingRoom === room.id" @click="finishEditing" class="edit-btn"
 									title="Сохранить">
-									<span class="material-icons btn-icons" style="user-select: none;">save</span>
+									<IconDeviceFloppy />
 								</button>
 								<button v-if="editingRoom === room.id" @click="cancelEditing" class="cancel-btn"
 									title="Отменить изменения">
-									<span class="material-icons btn-icons" style="user-select: none;">close</span>
+									<IconArrowBackUp />
 								</button>
 								<button v-else @click="startEditing(room)" class="edit-btn" title="Редактировать">
-									<span class="material-icons btn-icons" style="user-select: none;">edit</span>
+									<IconEdit />
 								</button>
 							</td>
 						</tr>
@@ -124,9 +122,6 @@
 		<div class="right-panel">
 			<div class="map-container">
 				<div class="map-controls" v-if="showMapControls">
-					<!-- <button @click="toggleMapControls" class="toggle-controls-btn">
-						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility_off</span>
-					</button> -->
 					<label style="user-select: none;">
 						Подложка
 						<input type="checkbox" v-model="showBackground" />
@@ -138,36 +133,37 @@
 						<input type="number" v-model="backgroundScale" min="0.1" max="1" step="0.01" />
 					</label> -->
 					<label title="Прозрачность подложки">
-						<span class="material-icons-outlined btn-icons"
-							style="user-select: none;">opacitywallpaper</span>
+						<IconDropCircle />
+						<IconPhoto />
 						<input type="range" v-model="backgroundOpacity" min="0" max="1" step="0.1" />
 					</label>
 					<label title="Прозрачность элеметов карты">
-						<span class="material-icons-outlined btn-icons" style="user-select: none;">opacitymap</span>
+						<IconDropCircle />
+						<IconMap />
 						<input type="range" v-model="elementsOpacity" min="0" max="1" step="0.1" />
 					</label>
 					<label title="Смещение подложки по оси абсцисс (X) (больше значение - левее подложка)">
-						<span class="material-icons-outlined btn-icons" style="user-select: none;">swap_horiz</span>
+						<IconArrowsHorizontal />
 						<input type="number" v-model.number="backgroundOffsetX" />
 					</label>
 					<label title="Смещение подложки по оси ординат (Y) (больше значение - ниже подложка)">
-						<span class="material-icons btn-icons" style="user-select: none;">swap_vert</span>
+						<IconArrowsVertical />
 						<input type="number" v-model.number="backgroundOffsetY" />
 					</label>
 					<label>
 						<b>Зажатие Alt отключает притягивание</b>
 					</label>
-					<button @click="toggleMapControls" class="toggle-controls-btn coord-input" title="Скрыть настройки">
-						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility_off</span>
+					<button @click="toggleMapControls" class="toggle-controls-btn" title="Скрыть настройки">
+						<IconEyeClosed />
 					</button>
 					<button @click="() => { this.panX = 10; this.panY = 10; this.scale = 1; }"
-						class="toggle-controls-btn" title="Положение по умолчанию">
-						<span class="material-icons-outlined btn-icons" style="user-select: none;">crop_free</span>
+						class="default-position-btn" title="Положение по умолчанию">
+						<IconFrame />
 					</button>
 				</div>
 				<div class="map-controls-enable" v-else>
 					<button @click="toggleMapControls" class="toggle-controls-btn" title="Показать настройки">
-						<span class="material-icons-outlined btn-icons" style="user-select: none;">visibility</span>
+						<IconEye />
 					</button>
 				</div>
 				<svg :width="svgWidth" :height="svgHeight" @wheel="handleZoom" @mousedown="startPan"
@@ -236,15 +232,6 @@
 									font-weight="bold">{{ index + 1 }}</text>
 							</g>
 						</g>
-						<!-- полигоны для регистрации нажатий по аудиториям (для части для юзеров, работает) -->
-						<!-- <g v-for="(classroom, index) in filteredRoomsCoords" :key="'classroom' + index">
-							<polygon
-								:points="formatPoints(classroom.points)"
-								fill-opacity="0"
-								stroke-opacity="0"
-								stroke-width="1"
-								@click="console.log('foo bar');" />
-						</g> -->
 					</g>
 				</svg>
 				<div class="cursor-coordinates">
@@ -261,8 +248,38 @@
 import { useToast } from "vue-toastification";
 import axios from "../axios";
 import polylabel from "polylabel";
+import {
+	IconArrowBackUp,
+	IconArrowsHorizontal,
+	IconArrowsVertical,
+	IconDeviceFloppy,
+	IconDropCircle,
+	IconEdit,
+	IconEye,
+	IconEyeClosed,
+	IconFrame,
+	IconMap,
+	IconMinus,
+	IconPhoto,
+	IconPlus
+} from "@tabler/icons-vue";
 
 export default {
+	components: {
+		IconMinus,
+		IconPlus,
+		IconDeviceFloppy,
+		IconDropCircle,
+		IconMap,
+		IconPhoto,
+		IconArrowsHorizontal,
+		IconArrowsVertical,
+		IconFrame,
+		IconEye,
+		IconEyeClosed,
+		IconEdit,
+		IconArrowBackUp,
+	},
 	data() {
 		return {
 			buildings: [],
@@ -349,11 +366,6 @@ export default {
 			this.$router.push("/login");
 			this.toast.info("Выход по истечении 30 минут или по кнопке");
 		},
-
-		// goToZero() {
-		// 	this.panX = 10;
-		// 	this.panY = 10;
-		// },
 
 		formatPoints(points) {
 			if (!Array.isArray(points) || points.length === 0) {
@@ -469,7 +481,6 @@ export default {
 				});
 
 				// извлечение этажей
-				// this.extractFloors();
 				this.availableFloors = [
 					...new Set(this.classrooms.map((classroom) => classroom.floor)),
 				].sort((a, b) => a - b);
@@ -478,14 +489,6 @@ export default {
 				console.error("Ошибка загрузки аудиторий: ", error);
 			}
 		},
-
-		// extractFloors() {
-		// 	// извлечение этажей из аудиторий
-		// 	this.availableFloors = [
-		// 		...new Set(this.classrooms.map((classroom) => classroom.floor)),
-		// 	].sort((a, b) => a - b);
-		// 	// console.log("Доступные этажи: ", this.availableFloors);
-		// },
 
 		updateRooms() {
 			if (this.selectedBuilding) {
@@ -1162,14 +1165,17 @@ export default {
 	background-color: rgba(255, 255, 255, 0.8);
 	margin: 10px;
 	padding: 10px 10px 0 0;
-	/* padding: 10px; */
 	z-index: 1000;
 }
 
 .map-controls label {
-	display: block;
+	display: flex;
+	align-items: center;
+	gap: 5px;
 	margin-bottom: 5px;
+	margin-left: 5px;
 }
+
 
 .map-controls-enable {
 	position: absolute;
@@ -1198,11 +1204,62 @@ export default {
 	background-color: rgba(255, 165, 0, 0.2);
 }
 
+.point-edit {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px;
+	border-bottom: 1px solid #ddd;
+}
+
 .coord-input {
-	margin-right: 5px;
+	padding: 5px;
 }
 
 .btn-icons {
-	font-size: 16px;
+	width: 16px;
+	height: 16px;
+}
+
+.remove-point-btn {
+	padding: 5px;
+	cursor: pointer;
+}
+
+.add-point-btn {
+	width: 100%;
+	padding: 5px;
+	cursor: pointer;
+	margin-top: 5px;
+}
+
+.point-number {
+	min-width: 24px;
+	text-align: right;
+	display: inline-block;
+}
+
+.action-cell {
+	vertical-align: top;
+	top: 100;
+}
+
+.action-cell button {
+	width: 100%;
+	margin-bottom: 5px;
+	cursor: pointer;
+}
+
+.action-cell button:last-child {
+  margin-bottom: 0;
+}
+
+.default-position-btn {
+	margin-left: 5px;
+	cursor: pointer;
+}
+
+.toggle-controls-btn {
+	cursor: pointer;
 }
 </style>
