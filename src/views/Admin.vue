@@ -31,7 +31,7 @@
 					</thead>
 					<tbody>
 						<!-- корпус -->
-						<tr v-if="selectedFloor"
+						<tr v-if="selectedFloor || selectedFloor === 0"
 							:class="{ 'active-room': editingFloor, 'unsaved-room': isFloorUnsaved }">
 							<td>Этаж</td>
 							<td>
@@ -936,6 +936,7 @@ export default {
 						points: []
 					}];
 				}
+				this.isFloorUnsaved = false;
 			} catch (error) {
 				console.error("ошибка загрузки координат этажа: ", error);
 				this.filteredBuildings = [{
@@ -943,6 +944,7 @@ export default {
 					floor: floor,
 					points: []
 				}];
+				this.isFloorUnsaved = false;
 			}
 		},
 
@@ -1010,17 +1012,27 @@ export default {
 		async fetchBackgroundImage(selectedBuilding, selectedFloor) {
 			try {
 				const response = await axios.get(`/GetPlanForFloor/buildingId/${selectedBuilding}/floor/${selectedFloor}`, { responseType: 'blob' });
-				const imageIrl = URL.createObjectURL(response.data);
-				this.backgroundImage = imageIrl;
+				// console.log('response.data.size', response.data.size);
+				if (response.data.size > 0) {
+					const imageIrl = URL.createObjectURL(response.data);
+					this.backgroundImage = imageIrl;
 
-				const img = new Image();
-				img.onload = () => {
-					this.backgroundWidth = img.width;
-					this.backgroundHeight = img.height;
-				};
-				img.src = imageIrl;
+					const img = new Image();
+					img.onload = () => {
+						this.backgroundWidth = img.width;
+						this.backgroundHeight = img.height;
+					};
+					img.src = imageIrl;
+				} else {
+					this.backgroundImage = null;
+					this.backgroundWidth = 0;
+					this.backgroundHeight = 0;
+				}
 			} catch (error) {
 				console.error("ошибка при загрузке подложки:", error);
+				this.backgroundImage = null;
+				this.backgroundWidth = 0;
+				this.backgroundHeight = 0;
 			}
 		},
 
@@ -1057,8 +1069,9 @@ export default {
 			this.updateRooms();
 		},
 		selectedFloor(newFloor) {
-			if (this.selectedBuilding && newFloor) {
+			if (this.selectedBuilding && newFloor !== '') {
 				this.fetchFloorCoordinates(this.selectedBuilding, newFloor);
+				this.fetchBackgroundImage(this.selectedBuilding, newFloor);
 				this.updateRooms();
 			}
 		},
@@ -1251,7 +1264,7 @@ export default {
 }
 
 .action-cell button:last-child {
-  margin-bottom: 0;
+	margin-bottom: 0;
 }
 
 .default-position-btn {
