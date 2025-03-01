@@ -494,7 +494,8 @@ export default {
 			if (this.selectedBuilding) {
 				this.fetchClassrooms(this.selectedBuilding);
 				this.filteredBuildings = [];
-				if (this.selectedFloor) {
+				this.clearBackgroundImage();
+				if (this.selectedFloor !== '') {
 					this.fetchBuildingCoordinates(this.selectedBuilding, this.selectedFloor);
 					this.fetchBackgroundImage(this.selectedBuilding, this.selectedFloor);
 				}
@@ -1024,20 +1025,25 @@ export default {
 					};
 					img.src = imageIrl;
 				} else {
-					this.backgroundImage = null;
-					this.backgroundWidth = 0;
-					this.backgroundHeight = 0;
+					this.clearBackgroundImage();
 				}
 			} catch (error) {
 				console.error("ошибка при загрузке подложки:", error);
-				this.backgroundImage = null;
-				this.backgroundWidth = 0;
-				this.backgroundHeight = 0;
+				this.clearBackgroundImage();
 			}
 		},
 
 		toggleMapControls() {
 			this.showMapControls = !this.showMapControls;
+		},
+
+		clearBackgroundImage() {
+			if (this.backgroundImage) {
+				URL.revokeObjectURL(this.backgroundImage);
+			}
+			this.backgroundImage = null;
+			this.backgroundWidth = 0;
+			this.backgroundHeight = 0;
 		}
 	},
 	mounted() {
@@ -1048,9 +1054,7 @@ export default {
 		window.addEventListener('keyup', this.handleKeyUp);
 	},
 	beforeUnmount() {
-		if (this.backgroundImage) {
-			URL.revokeObjectURL(this.backgroundImage);
-		}
+		this.clearBackgroundImage();
 		window.removeEventListener('keydown', this.handleKeyDown);
 		window.removeEventListener('keyup', this.handleKeyUp);
 	},
@@ -1065,7 +1069,7 @@ export default {
 				: "";
 
 			this.selectedFloor = '';
-
+			this.clearBackgroundImage();
 			this.updateRooms();
 		},
 		selectedFloor(newFloor) {
@@ -1073,6 +1077,8 @@ export default {
 				this.fetchFloorCoordinates(this.selectedBuilding, newFloor);
 				this.fetchBackgroundImage(this.selectedBuilding, newFloor);
 				this.updateRooms();
+			} else {
+				this.clearBackgroundImage();
 			}
 		},
 	},
